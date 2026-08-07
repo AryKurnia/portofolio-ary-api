@@ -1,0 +1,948 @@
+openapi: 3.1.0
+info:
+  title: Ary Portofolio API
+  description: API documentation untuk Portofolio Ary Kurnia
+  version: 1.0.0
+  contact:
+    name: Ary Kurnia
+    email: aryk922@gmail.com
+servers:
+  - url: https://arykurnia.com/api/v1
+    description: Production server
+  - url: http://localhost:3000/api/v1
+    description: Development server
+
+tags:
+  - name: Auth
+  - name: Profile
+  - name: Skills
+  - name: Projects
+  - name: Experience
+
+security: []
+
+paths:
+  # ============================================================
+  # AUTH
+  # ============================================================
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login admin
+      description: Login untuk mendapatkan JWT token, digunakan untuk mengakses endpoint write.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: aryk922@gmail.com
+                password:
+                  type: string
+                  format: password
+                  example: "supersecret"
+      responses:
+        '200':
+          description: Login berhasil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  expiresIn:
+                    type: integer
+                    example: 3600
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================================
+  # PROFILE
+  # ============================================================
+  /profile:
+    get:
+      tags: [Profile]
+      summary: Get personal information
+      description: Retrieve data profil inti (tanpa skills/projects/experience).
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+    put:
+      tags: [Profile]
+      summary: Update personal information
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileInput'
+      responses:
+        '200':
+          description: Profile berhasil diupdate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /profile/photo:
+    post:
+      tags: [Profile]
+      summary: Upload/ganti foto profile
+      description: Upload file foto profil, disimpan ke object storage (MinIO). Field `photoUrl` pada profile akan diupdate otomatis.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [photo]
+              properties:
+                photo:
+                  type: string
+                  format: binary
+                  description: File gambar (png, jpg, webp — maks 2MB)
+      responses:
+        '200':
+          description: Foto profile berhasil diupload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /profile/social-media:
+    get:
+      tags: [Profile]
+      summary: List semua social media
+      responses:
+        '200':
+          description: Daftar social media
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SocialMediaLink'
+
+  /profile/social-media/{platform}:
+    parameters:
+      - $ref: '#/components/parameters/PlatformParam'
+    get:
+      tags: [Profile]
+      summary: Detail social media per platform
+      responses:
+        '200':
+          description: Detail social media
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialMediaLink'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Profile]
+      summary: Update social media per platform
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SocialMediaInput'
+      responses:
+        '200':
+          description: Social media berhasil diupdate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialMediaLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================================
+  # SKILLS
+  # ============================================================
+  /skills:
+    get:
+      tags: [Skills]
+      summary: List semua skill
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Daftar skill
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Skill'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      tags: [Skills]
+      summary: Tambah skill baru
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillInput'
+      responses:
+        '201':
+          description: Skill berhasil dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Skill'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /skills/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Skills]
+      summary: Detail skill
+      responses:
+        '200':
+          description: Detail skill
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Skill'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Skills]
+      summary: Update skill
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillInput'
+      responses:
+        '200':
+          description: Skill berhasil diupdate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Skill'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Skills]
+      summary: Hapus skill
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Skill berhasil dihapus
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /skills/{id}/logo:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      tags: [Skills]
+      summary: Upload/ganti logo skill
+      description: Upload file gambar logo, disimpan ke object storage (MinIO). Field `logoUrl` pada skill akan diupdate otomatis.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [logo]
+              properties:
+                logo:
+                  type: string
+                  format: binary
+                  description: File gambar (png, jpg, webp, svg — maks 2MB)
+      responses:
+        '200':
+          description: Logo berhasil diupload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Skill'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================================
+  # PROJECTS
+  # ============================================================
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List semua project
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Daftar project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      tags: [Projects]
+      summary: Tambah project baru
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectInput'
+      responses:
+        '201':
+          description: Project berhasil dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Projects]
+      summary: Detail project
+      responses:
+        '200':
+          description: Detail project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Projects]
+      summary: Update project
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectInput'
+      responses:
+        '200':
+          description: Project berhasil diupdate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Projects]
+      summary: Hapus project
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Project berhasil dihapus
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{id}/thumbnail:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      tags: [Projects]
+      summary: Upload/ganti thumbnail project
+      description: Upload file gambar thumbnail, disimpan ke object storage (MinIO). Field `thumbnailUrl` pada project akan diupdate otomatis.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [thumbnail]
+              properties:
+                thumbnail:
+                  type: string
+                  format: binary
+                  description: File gambar (png, jpg, webp — maks 2MB)
+      responses:
+        '200':
+          description: Thumbnail berhasil diupload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================================
+  # EXPERIENCE - EDUCATIONS
+  # ============================================================
+  /experience/educations:
+    get:
+      tags: [Experience]
+      summary: List riwayat pendidikan
+      responses:
+        '200':
+          description: Daftar pendidikan
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Education'
+    post:
+      tags: [Experience]
+      summary: Tambah riwayat pendidikan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EducationInput'
+      responses:
+        '201':
+          description: Pendidikan berhasil ditambahkan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Education'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /experience/educations/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Experience]
+      summary: Detail pendidikan
+      responses:
+        '200':
+          description: Detail pendidikan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Education'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Experience]
+      summary: Update riwayat pendidikan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EducationInput'
+      responses:
+        '200':
+          description: Pendidikan berhasil diupdate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Education'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Experience]
+      summary: Hapus riwayat pendidikan
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Pendidikan berhasil dihapus
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # EXPERIENCE - JOBS
+  # ============================================================
+  /experience/jobs:
+    get:
+      tags: [Experience]
+      summary: List riwayat pekerjaan
+      responses:
+        '200':
+          description: Daftar pekerjaan
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Job'
+    post:
+      tags: [Experience]
+      summary: Tambah riwayat pekerjaan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobInput'
+      responses:
+        '201':
+          description: Pekerjaan berhasil ditambahkan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /experience/jobs/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Experience]
+      summary: Detail pekerjaan
+      responses:
+        '200':
+          description: Detail pekerjaan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Experience]
+      summary: Update riwayat pekerjaan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobInput'
+      responses:
+        '200':
+          description: Pekerjaan berhasil diupdate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Experience]
+      summary: Hapus riwayat pekerjaan
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Pekerjaan berhasil dihapus
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ============================================================
+# COMPONENTS
+# ============================================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+    PlatformParam:
+      name: platform
+      in: path
+      required: true
+      description: Nama platform sebagai unique key (bukan integer id)
+      schema:
+        type: string
+        enum: [linkedin, github, facebook, instagram, twitter]
+      example: linkedin
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 10
+
+  responses:
+    Unauthorized:
+      description: Token tidak valid atau tidak disertakan
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource tidak ditemukan
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Payload tidak valid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 404
+        error:
+          type: string
+          example: "Not Found"
+        message:
+          type: string
+          example: "Skill dengan id tersebut tidak ditemukan."
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 42
+
+    SocialMediaLink:
+      type: object
+      properties:
+        platform:
+          type: string
+          example: linkedin
+        url:
+          type: string
+          example: https://www.linkedin.com/in/arykurnia
+        username:
+          type: string
+          example: arykurnia
+        enabled:
+          type: boolean
+          default: true
+
+    SocialMediaInput:
+      type: object
+      required: [url, username]
+      properties:
+        url:
+          type: string
+          example: https://www.linkedin.com/in/arykurnia
+        username:
+          type: string
+          example: arykurnia
+        enabled:
+          type: boolean
+          default: true
+
+    Profile:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Ary Kurnia
+        email:
+          type: string
+          example: aryk922@gmail.com
+        tagline:
+          type: string
+          example: "a Web and Back-End developer."
+        about:
+          type: string
+          example: "Saya adalah lulusan S1 Teknik Informatika yang memiliki ketertarikan mendalam pada rekayasa perangkat lunak, khususnya di sisi backend dan infrastruktur."
+        photoUrl:
+          type: string
+          example: https://minio.arykurnia.my.id/portfolio/profile/photo.jpg
+        socialMedia:
+          type: array
+          items:
+            $ref: '#/components/schemas/SocialMediaLink'
+
+    ProfileInput:
+      type: object
+      required: [name, email, tagline, about]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        tagline:
+          type: string
+        about:
+          type: string
+
+    Skill:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Node.js
+        logoUrl:
+          type: string
+          example: https://nodejs.org/static/images/logo.svg
+        description:
+          type: string
+          example: "Node.js adalah runtime JavaScript yang berjalan di server."
+        enabled:
+          type: boolean
+          default: true
+
+    SkillInput:
+      type: object
+      required: [name, logoUrl]
+      properties:
+        name:
+          type: string
+        logoUrl:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+          default: true
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Portofolio Ary Kurnia
+        description:
+          type: string
+          example: "Sebuah situs portofolio yang menampilkan berbagai proyek dan keahlian."
+        thumbnailUrl:
+          type: string
+          example: https://arykurnia.com/thumbnail.jpg
+        url:
+          type: string
+          example: https://arykurnia.com
+        enabled:
+          type: boolean
+          default: true
+
+    ProjectInput:
+      type: object
+      required: [name, description]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        thumbnailUrl:
+          type: string
+        url:
+          type: string
+        enabled:
+          type: boolean
+          default: true
+
+    Education:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        institution:
+          type: string
+          example: Universitas XYZ
+        degree:
+          type: string
+          example: Sarjana Teknik Informatika
+        fieldOfStudy:
+          type: string
+          example: Teknik Informatika
+        startDate:
+          type: string
+          format: date
+          example: 2015-09-01
+        endDate:
+          type: string
+          format: date
+          example: 2019-06-30
+        description:
+          type: string
+
+    EducationInput:
+      type: object
+      required: [institution, degree, fieldOfStudy, startDate]
+      properties:
+        institution:
+          type: string
+        degree:
+          type: string
+        fieldOfStudy:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        description:
+          type: string
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        company:
+          type: string
+          example: PT ABC
+        position:
+          type: string
+          example: Backend Developer
+        startDate:
+          type: string
+          format: date
+          example: 2019-07-01
+        endDate:
+          type: string
+          format: date
+          example: 2021-12-31
+        description:
+          type: string
+
+    JobInput:
+      type: object
+      required: [company, position, startDate]
+      properties:
+        company:
+          type: string
+        position:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        description:
+          type: string
