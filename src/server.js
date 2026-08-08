@@ -37,6 +37,34 @@ const init = async () => {
   await server.register(require('./interfaces/http/auth/index'));
   await server.register(require('./interfaces/http/skills/index'));
 
+  // Error Handling
+  server.ext('onPreResponse', (request, h) => {
+    const { response } = request;
+
+    if (!response.isBoom) {
+      return h.continue;
+    }
+
+    if (response instanceof NotFoundError) {
+      return h.response({ statusCode: 404, error: 'Not Found', message: response.message }).code(404);
+    }
+
+    if (response instanceof AuthenticationError) {
+      return h.response({ statusCode: 401, error: 'Unauthorized', message: response.message }).code(401);
+    }
+
+    if (response.output.statusCode < 500) {
+      return h.continue; // error bawaan Hapi (400 validasi, 401 auth plugin, dst)
+    }
+
+    console.error('[UNHANDLED ERROR]', response);
+    return h.response({
+      statusCode: 500,
+      error: 'Internal Server Error',
+      message: 'Terjadi kesalahan pada server',
+    }).code(500);
+  });
+
   await server.start();
   console.log('Server running on %s', server.info.uri);
 };

@@ -2,6 +2,8 @@ const streamConsumers = require('node:stream/consumers');
 const container = require('../../../infrastructure/container');
 const NotFoundError = require('../../../exceptions/NotFoundError');
 
+const Boom = require('@hapi/boom');
+
 const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
 
 function errorResponse(h, statusCode, message) {
@@ -26,23 +28,13 @@ module.exports = {
   },
 
   async update(request, h) {
-    try {
-      const skill = await container.updateSkill.execute(request.params.id, request.payload);
-      return h.response(skill).code(200);
-    } catch (err) {
-      if (err instanceof NotFoundError) return errorResponse(h, 404, err.message);
-      throw err;
-    }
+    const skill = await container.updateSkill.execute(request.params.id, request.payload);
+    return h.response(skill).code(200);
   },
 
   async remove(request, h) {
-    try {
-      await container.deleteSkill.execute(request.params.id);
-      return h.response().code(204);
-    } catch (err) {
-      if (err instanceof NotFoundError) return errorResponse(h, 404, err.message);
-      throw err;
-    }
+    await container.deleteSkill.execute(request.params.id);
+    return h.response().code(204);
   },
 
   async uploadLogo(request, h) {
@@ -50,22 +42,17 @@ module.exports = {
     const mimeType = file.hapi.headers['content-type'];
 
     if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
-      return errorResponse(h, 422, `Tipe file ${mimeType} tidak diizinkan`);
+      throw Boom.unsupportedMediaType(`Tipe file ${mimeType} tidak diizinkan`);
     }
 
     const buffer = await streamConsumers.buffer(file);
 
-    try {
-      const skill = await container.uploadSkillLogo.execute({
-        id: request.params.id,
-        buffer,
-        filename: file.hapi.filename,
-        mimeType,
-      });
-      return h.response(skill).code(200);
-    } catch (err) {
-      if (err instanceof NotFoundError) return errorResponse(h, 404, err.message);
-      throw err;
-    }
+    const skill = await container.uploadSkillLogo.execute({
+      id: request.params.id,
+      buffer,
+      filename: file.hapi.filename,
+      mimeType,
+    });
+    return h.response(skill).code(200);
   },
 };
