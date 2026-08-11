@@ -7,6 +7,7 @@ module.exports = {
     database: process.env.DATABASE_NAME,
     host: process.env.DATABASE_HOST,
     dialect: 'mysql',
+    seederStorage: 'sequelize',
   },
   test: {
     username: process.env.DATABASE_USER,
