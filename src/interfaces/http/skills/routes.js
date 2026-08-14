@@ -56,7 +56,7 @@ module.exports = [
         output: 'stream',
         parse: true,
         multipart: true,
-        maxBytes: 2 * 1024 * 1024, // 2MB, sesuai OpenAPI
+        maxBytes: 2 * 1024 * 1024, // 2MB
         allow: 'multipart/form-data',
       },
       validate: { params: idParamSchema },
