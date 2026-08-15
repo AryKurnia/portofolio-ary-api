@@ -36,6 +36,7 @@ const init = async () => {
 
   await server.register(require('./interfaces/http/auth/index'));
   await server.register(require('./interfaces/http/skills/index'));
+  await server.register(require('./interfaces/http/social-media/index'));
 
   // Error Handling
   server.ext('onPreResponse', (request, h) => {
