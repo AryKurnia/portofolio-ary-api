@@ -2,7 +2,8 @@ const Repository = require('./Repository');
 
 class ProjectRepository extends Repository {
   // Urut sort_order ASC, lalu created_at DESC. → { data, meta: { page, limit, total } }
-  async findAll({ page, limit } = {}) {
+  // publishedOnly: hanya project dengan is_published = true (halaman publik).
+  async findAll({ page, limit, publishedOnly } = {}) {
     this._notImplemented('findAll');
   }
 

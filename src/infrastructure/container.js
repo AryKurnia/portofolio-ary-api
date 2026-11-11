@@ -63,6 +63,13 @@ const UpdateProject = require('../use-cases/project/UpdateProject');
 const DeleteProject = require('../use-cases/project/DeleteProject');
 const ReorderProjects = require('../use-cases/project/ReorderProjects');
 
+// Public (halaman portofolio)
+const ListPublishedProjects = require('../use-cases/public/ListPublishedProjects');
+const GetPublishedProject = require('../use-cases/public/GetPublishedProject');
+const GetTimeline = require('../use-cases/public/GetTimeline');
+const ListPublicSocialLinks = require('../use-cases/public/ListPublicSocialLinks');
+const GetPortfolio = require('../use-cases/public/GetPortfolio');
+
 // Media Social
 const ListSocialMedia = require('../use-cases/social-media/ListSocialMedia');
 const GetSocialMediaByPlatform = require('../use-cases/social-media/GetSocialMediaByPlatform');
@@ -97,7 +104,23 @@ const tokenManager = new JwtTokenManager({
 });
 const fileStorage = new MinioFileStorage(minioClient, config.minio.bucket, config.minio.publicUrl);
 
+const getProfile = new GetProfile(profileRepository);
+const listPublishedProjects = new ListPublishedProjects(projectRepository);
+const getTimeline = new GetTimeline(organizationRepository);
+const listPublicSocialLinks = new ListPublicSocialLinks(socialMediaRepository);
+
 module.exports = {
+  // Public
+  listPublishedProjects,
+  getPublishedProject: new GetPublishedProject(projectRepository),
+  getTimeline,
+  listPublicSocialLinks,
+  getPortfolio: new GetPortfolio({
+    getProfile,
+    listPublishedProjects,
+    getTimeline,
+    listPublicSocialLinks,
+  }),
   // Health
   checkHealth: new CheckHealth({ pingDatabase: () => sequelize.authenticate() }),
   // Auth
@@ -106,7 +129,7 @@ module.exports = {
   logoutUser: new LogoutUser(refreshTokenRepository, tokenManager),
   getCurrentAdmin: new GetCurrentAdmin(userRepository),
   // Profile
-  getProfile: new GetProfile(profileRepository),
+  getProfile,
   updateProfile: new UpdateProfile(profileRepository),
   // Timeline
   listOrganizations: new ListOrganizations(organizationRepository),

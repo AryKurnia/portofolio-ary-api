@@ -26,8 +26,9 @@ class MariaDBProjectRepository extends ProjectRepository {
     ];
   }
 
-  async findAll({ page = 1, limit = 12 } = {}) {
+  async findAll({ page = 1, limit = 12, publishedOnly = false } = {}) {
     const { rows, count } = await this._model.findAndCountAll({
+      where: publishedOnly ? { isPublished: true } : {},
       order: this._order,
       offset: (page - 1) * limit,
       limit,
