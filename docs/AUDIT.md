@@ -79,9 +79,11 @@ Perintah yang dijalankan (read-only): `npm ls`, `npm outdated`, `npm audit`,
 | **M5 (bagian 1)** admin timeline: CRUD organizations & positions + reorder; aturan API.md §3 per field; urutan §6; `type_label`/`period_label` | ✅ |
 | **M5 (bagian 2)** admin skill categories: CRUD + reorder (409 nama duplikat) | ✅ — `skill_count` & 409 "masih berisi skill" menyusul di bagian 3 (butuh `skills.category_id`) |
 | **M5 (bagian 2)** admin projects: CRUD + reorder + paginasi; `show_button` ⇒ link https, terbit ⇒ `image_id` yang ada | ✅ — URL gambar & varian menyusul di M4; project baru bisa terbit setelah upload tersedia |
+| **M6** publik: `GET /portfolio`, `/profile`, `/projects`, `/projects/{id}`, `/timeline`, `/social-links` — hanya data terbit; `Cache-Control` publik + `ETag`/304 | ✅ — `skills` per kategori di `/portfolio` menyusul bagian 3; gambar project menyusul M4; social links sementara dari `social_media` (hanya yang aktif, platform dinormalkan huruf kecil) |
+| S7 data non-publik bocor di endpoint publik | ✅ untuk endpoint baru; endpoint lama `/skills` & `/profile/social-media` masih menampilkan yang nonaktif sampai diganti di bagian 3 |
 | **M5 (bagian 3)** skills (kategori, urutan, `is_published`, logo via media) & social links (ganti `social_media`) — mengubah tabel/endpoint lama | ⏳ |
-| Tes unit + route + kontrak | 388 lulus (39 suite), termasuk 120 skenario kontrak OpenAPI |
-| Tes integrasi `npm run test:integration` (DB tes sungguhan) | 32 lulus: repository timeline/profile/kategori/project, alur auth ujung-ke-ujung, constraint skema |
+| Tes unit + route + kontrak | 427 lulus (41 suite), termasuk 131 skenario kontrak OpenAPI |
+| Tes integrasi `npm run test:integration` (DB tes sungguhan) | 37 lulus: repository timeline/profile/kategori/project, endpoint publik, alur auth ujung-ke-ujung, constraint skema |
 
 ---
 

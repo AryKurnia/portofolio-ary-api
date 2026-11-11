@@ -704,6 +704,43 @@ scenarios.push(
   ]
 );
 
+// --- Public (M6) ---
+const publicTimeline = { education: [], work_organization: [organization] };
+const publicSocial = [
+  { platform: 'github', url: 'https://github.com/x', username: 'x', enabled: true },
+];
+
+scenarios.push(
+  [
+    'GET',
+    '/portfolio',
+    '/portfolio',
+    {},
+    resolves('getPortfolio', {
+      profile,
+      projects: { items: [project], total: 1, hasMore: false },
+      timeline: publicTimeline,
+      socialLinks: publicSocial,
+    }),
+  ],
+  ['GET', '/portfolio', '/portfolio', {}, rejects('getPortfolio', notFound)],
+  ['GET', '/profile', '/profile', {}, resolves('getProfile', profile)],
+  ['GET', '/profile', '/profile', {}, rejects('getProfile', notFound)],
+  [
+    'GET',
+    '/projects',
+    '/projects',
+    {},
+    resolves('listPublishedProjects', { data: [project], meta: { page: 1, limit: 12, total: 1 } }),
+  ],
+  ['GET', '/projects', '/projects?page=0', {}],
+  ['GET', '/projects/{id}', '/projects/1', {}, resolves('getPublishedProject', project)],
+  ['GET', '/projects/{id}', '/projects/abc', {}],
+  ['GET', '/projects/{id}', '/projects/99', {}, rejects('getPublishedProject', notFound)],
+  ['GET', '/timeline', '/timeline', {}, resolves('getTimeline', publicTimeline)],
+  ['GET', '/social-links', '/social-links', {}, resolves('listPublicSocialLinks', publicSocial)]
+);
+
 describe('Kontrak docs/openapi.yaml', () => {
   let server;
   const exercised = new Set();

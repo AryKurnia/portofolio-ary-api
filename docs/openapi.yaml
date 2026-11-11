@@ -26,6 +26,11 @@ servers:
     description: Development server
 
 tags:
+  - name: Public
+    description: |
+      Endpoint halaman portofolio: tanpa auth, hanya data yang terbit.
+      Semua respons 200 membawa `Cache-Control: public, max-age=60, stale-while-revalidate=300`
+      dan `ETag`; kirim `If-None-Match` untuk mendapat `304 Not Modified` tanpa body.
   - name: Health
   - name: Auth
   - name: Skills
@@ -38,6 +43,166 @@ tags:
 security: []
 
 paths:
+  # ============================================================
+  # PUBLIC (halaman portofolio)
+  # ============================================================
+  /portfolio:
+    get:
+      tags: [Public]
+      summary: Semua data halaman utama dalam satu request (untuk SSR/ISR)
+      description: |
+        `projects.items` berisi maksimal 6 project terbit; `has_more` memunculkan tombol
+        "See all projects". Skill per kategori ditambahkan setelah skill dikaitkan ke kategori.
+      responses:
+        '200':
+          description: Data portofolio
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [profile, projects, timeline, social_links]
+                    additionalProperties: false
+                    properties:
+                      profile: { $ref: '#/components/schemas/PublicProfile' }
+                      projects:
+                        type: object
+                        required: [items, total, has_more]
+                        additionalProperties: false
+                        properties:
+                          items:
+                            type: array
+                            maxItems: 6
+                            items: { $ref: '#/components/schemas/PublicProject' }
+                          total: { type: integer }
+                          has_more: { type: boolean }
+                      timeline: { $ref: '#/components/schemas/PublicTimeline' }
+                      social_links:
+                        type: array
+                        items: { $ref: '#/components/schemas/PublicSocialLink' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /profile:
+    get:
+      tags: [Public]
+      summary: Profil (hero, about, intro project, email kontak)
+      responses:
+        '200':
+          description: Profil
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PublicProfile' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects:
+    get:
+      tags: [Public]
+      summary: Project terbit untuk Projects Archive (berpaginasi)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 12 }
+      responses:
+        '200':
+          description: Daftar project terbit
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PublicProject' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Public]
+      summary: Detail project terbit
+      description: Project yang belum terbit dibalas 404 seperti tidak ada.
+      responses:
+        '200':
+          description: Project
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PublicProject' }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /timeline:
+    get:
+      tags: [Public]
+      summary: Education & Work/Organization, terurut dan berlabel
+      description: |
+        Struktur selalu organisasi → posisi; frontend memilih Timeline Item (1 posisi) atau
+        Timeline Group (≥ 2 posisi). Organisasi tanpa posisi tidak ditampilkan.
+      responses:
+        '200':
+          description: Timeline
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PublicTimeline' }
+
+  /social-links:
+    get:
+      tags: [Public]
+      summary: Tautan media sosial yang aktif
+      responses:
+        '200':
+          description: Tautan sosial
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PublicSocialLink' }
+
   # ============================================================
   # HEALTH
   # ============================================================
@@ -850,6 +1015,12 @@ components:
       bearerFormat: JWT
 
   headers:
+    ETag:
+      description: Hash isi respons; kirim balik lewat If-None-Match untuk 304
+      schema: { type: string }
+    PublicCacheControl:
+      description: 'public, max-age=60, stale-while-revalidate=300'
+      schema: { type: string }
     RefreshTokenCookie:
       description: '`refresh_token=<token>; Max-Age=604800; Path=/api/v1/admin/auth; HttpOnly; SameSite=Strict` (+ `Secure` di production)'
       schema:
@@ -1325,6 +1496,84 @@ components:
         - $ref: '#/components/schemas/ProjectFields'
         - type: object
           minProperties: 1
+
+    PublicProfile:
+      type: object
+      required: [greeting, tagline, about, project_intro, email]
+      additionalProperties: false
+      properties:
+        greeting: { type: string }
+        tagline: { type: string }
+        about: { type: string }
+        project_intro: { type: [string, 'null'] }
+        email: { type: string, format: email }
+
+    PublicProject:
+      type: object
+      required: [id, title, description, link_url, show_button]
+      additionalProperties: false
+      description: Gambar (URL + varian ukuran) ditambahkan bersama fitur upload (M4).
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        link_url: { type: [string, 'null'], format: uri }
+        show_button: { type: boolean }
+
+    PublicPosition:
+      type: object
+      required: [id, title, type, type_label, event_name, start_date, end_date, is_current,
+                 period_label, description]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        type: { $ref: '#/components/schemas/PositionType' }
+        type_label: { type: string, example: Full-time }
+        event_name: { type: [string, 'null'] }
+        start_date: { $ref: '#/components/schemas/YearMonth' }
+        end_date:
+          oneOf:
+            - $ref: '#/components/schemas/YearMonth'
+            - type: 'null'
+        is_current: { type: boolean }
+        period_label: { type: string, example: 2025 – Present }
+        description: { type: [string, 'null'] }
+
+    PublicOrganization:
+      type: object
+      required: [id, name, location, is_current, positions]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        location: { type: [string, 'null'] }
+        is_current: { type: boolean }
+        positions:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/PublicPosition' }
+
+    PublicTimeline:
+      type: object
+      required: [education, work_organization]
+      additionalProperties: false
+      properties:
+        education:
+          type: array
+          items: { $ref: '#/components/schemas/PublicOrganization' }
+        work_organization:
+          type: array
+          items: { $ref: '#/components/schemas/PublicOrganization' }
+
+    PublicSocialLink:
+      type: object
+      required: [platform, label, url]
+      additionalProperties: false
+      properties:
+        platform: { type: string, example: github }
+        label: { type: string, example: GitHub }
+        url: { type: string, format: uri }
 
     PaginationMeta:
       type: object
