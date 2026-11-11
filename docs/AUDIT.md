@@ -74,7 +74,12 @@ Perintah yang dijalankan (read-only): `npm ls`, `npm outdated`, `npm audit`,
 | Database tes `portfolio_test_db` | ✅ dibuat pemilik; dipakai untuk uji migrasi & e2e (berisi data palsu) |
 | User DB aplikasi `ary@%` punya `ALL PRIVILEGES` | ⏳ M7: pisahkan user aplikasi (DML saja) dan user migrasi |
 | S1 rate limit login (K11b) | ➡️ dipindah ke reverse proxy — contoh konfigurasi di §5.6; **belum terpasang** |
-| Tes | 158 lulus (25 suite), termasuk 42 skenario kontrak OpenAPI |
+| **M3** tabel baru `media`, `profile`, `skill_categories`, `projects`, `organizations`, `positions` + seed konten | ✅ diuji di DB tes (maju/mundur, 16 constraint); ⏳ **belum dijalankan di `portfolio_db`** — tunggu `ADMIN_EMAIL` di `.env` + persetujuan |
+| **M5 (bagian 1)** admin profile: `GET/PATCH /admin/profile` | ✅ |
+| **M5 (bagian 1)** admin timeline: CRUD organizations & positions + reorder; aturan API.md §3 per field; urutan §6; `type_label`/`period_label` | ✅ |
+| **M5 (sisa)** skill categories, projects, skills (ubah tabel lama), social links (ganti `social_media`) | ⏳ |
+| Tes unit + route + kontrak | 287 lulus (33 suite), termasuk 81 skenario kontrak OpenAPI |
+| Tes integrasi `npm run test:integration` (DB tes sungguhan) | 26 lulus: repository timeline/profile, alur auth ujung-ke-ujung, constraint skema |
 
 ---
 

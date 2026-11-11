@@ -277,6 +277,235 @@ const scenarios = [
   ],
 ];
 
+// --- Profile & timeline (M5) ---
+const ConflictError = require('../../src/exceptions/ConflictError');
+const ValidationError = require('../../src/exceptions/ValidationError');
+
+const profile = {
+  greeting: "Hi, I'm Ary",
+  tagline: 'a developer',
+  about: 'Tentang saya',
+  projectIntro: null,
+  email: 'admin@example.com',
+  updatedAt: new Date('2026-11-11T00:00:00Z'),
+};
+const position = {
+  id: 5,
+  organizationId: 1,
+  title: 'Ketua Panitia',
+  type: 'committee',
+  eventName: 'Diksar',
+  startDate: '2024-01',
+  endDate: null,
+  isCurrent: false,
+  description: null,
+  sortOrder: 1,
+};
+const organization = {
+  id: 1,
+  name: 'MAPALA',
+  group: 'work_organization',
+  location: null,
+  sortOrder: null,
+  positions: [position],
+};
+const conflict = () =>
+  Promise.reject(new ConflictError('Duplicate.', [{ field: 'name', message: 'Already used.' }]));
+const invalid = () =>
+  Promise.reject(
+    new ValidationError('Some fields are invalid.', [{ field: 'end_date', message: 'x' }])
+  );
+const resolves = (useCase, value) => () => container[useCase].execute.mockResolvedValue(value);
+const rejects = (useCase, fn) => () => container[useCase].execute.mockImplementation(fn);
+
+const positionInput = {
+  organization_id: 1,
+  title: 'Ketua',
+  type: 'committee',
+  event_name: 'Diksar',
+  start_date: '2024-01',
+};
+
+scenarios.push(
+  ['GET', '/admin/profile', '/admin/profile', { auth: true }, resolves('getProfile', profile)],
+  ['GET', '/admin/profile', '/admin/profile', {}],
+  ['GET', '/admin/profile', '/admin/profile', { auth: true }, rejects('getProfile', notFound)],
+  [
+    'PATCH',
+    '/admin/profile',
+    '/admin/profile',
+    { auth: true, payload: { tagline: 'x' } },
+    resolves('updateProfile', profile),
+  ],
+  ['PATCH', '/admin/profile', '/admin/profile', { auth: true, payload: {} }],
+  ['PATCH', '/admin/profile', '/admin/profile', { payload: { tagline: 'x' } }],
+  [
+    'PATCH',
+    '/admin/profile',
+    '/admin/profile',
+    { auth: true, payload: { tagline: 'x' } },
+    rejects('updateProfile', notFound),
+  ],
+
+  [
+    'GET',
+    '/admin/organizations',
+    '/admin/organizations',
+    { auth: true },
+    resolves('listOrganizations', [organization]),
+  ],
+  ['GET', '/admin/organizations', '/admin/organizations?group=hobby', { auth: true }],
+  ['GET', '/admin/organizations', '/admin/organizations', {}],
+  [
+    'POST',
+    '/admin/organizations',
+    '/admin/organizations',
+    { auth: true, payload: { name: 'X', group: 'education' } },
+    resolves('createOrganization', { ...organization, positions: [] }),
+  ],
+  ['POST', '/admin/organizations', '/admin/organizations', { auth: true, payload: { name: 'X' } }],
+  [
+    'POST',
+    '/admin/organizations',
+    '/admin/organizations',
+    { payload: { name: 'X', group: 'education' } },
+  ],
+  [
+    'POST',
+    '/admin/organizations',
+    '/admin/organizations',
+    { auth: true, payload: { name: 'X', group: 'education' } },
+    rejects('createOrganization', conflict),
+  ],
+
+  [
+    'PATCH',
+    '/admin/organizations/{id}',
+    '/admin/organizations/1',
+    { auth: true, payload: { location: 'Makassar' } },
+    resolves('updateOrganization', organization),
+  ],
+  [
+    'PATCH',
+    '/admin/organizations/{id}',
+    '/admin/organizations/1',
+    { auth: true, payload: { group: 'education' } },
+  ],
+  ['PATCH', '/admin/organizations/{id}', '/admin/organizations/1', { payload: { location: 'x' } }],
+  [
+    'PATCH',
+    '/admin/organizations/{id}',
+    '/admin/organizations/99',
+    { auth: true, payload: { location: 'x' } },
+    rejects('updateOrganization', notFound),
+  ],
+  [
+    'PATCH',
+    '/admin/organizations/{id}',
+    '/admin/organizations/1',
+    { auth: true, payload: { name: 'Lain' } },
+    rejects('updateOrganization', conflict),
+  ],
+  [
+    'DELETE',
+    '/admin/organizations/{id}',
+    '/admin/organizations/1',
+    { auth: true },
+    resolves('deleteOrganization', undefined),
+  ],
+  ['DELETE', '/admin/organizations/{id}', '/admin/organizations/abc', { auth: true }],
+  ['DELETE', '/admin/organizations/{id}', '/admin/organizations/1', {}],
+  [
+    'DELETE',
+    '/admin/organizations/{id}',
+    '/admin/organizations/99',
+    { auth: true },
+    rejects('deleteOrganization', notFound),
+  ],
+
+  [
+    'PATCH',
+    '/admin/organizations/{id}/positions/reorder',
+    '/admin/organizations/1/positions/reorder',
+    { auth: true, payload: { ids: [2, 1] } },
+    resolves('reorderPositions', undefined),
+  ],
+  [
+    'PATCH',
+    '/admin/organizations/{id}/positions/reorder',
+    '/admin/organizations/1/positions/reorder',
+    { auth: true, payload: { ids: [] } },
+  ],
+  [
+    'PATCH',
+    '/admin/organizations/{id}/positions/reorder',
+    '/admin/organizations/1/positions/reorder',
+    { payload: { ids: [1] } },
+  ],
+  [
+    'PATCH',
+    '/admin/organizations/{id}/positions/reorder',
+    '/admin/organizations/99/positions/reorder',
+    { auth: true, payload: { ids: [1] } },
+    rejects('reorderPositions', notFound),
+  ],
+
+  [
+    'POST',
+    '/admin/positions',
+    '/admin/positions',
+    { auth: true, payload: positionInput },
+    resolves('createPosition', position),
+  ],
+  [
+    'POST',
+    '/admin/positions',
+    '/admin/positions',
+    { auth: true, payload: positionInput },
+    rejects('createPosition', invalid),
+  ],
+  ['POST', '/admin/positions', '/admin/positions', { payload: positionInput }],
+  [
+    'POST',
+    '/admin/positions',
+    '/admin/positions',
+    { auth: true, payload: positionInput },
+    rejects('createPosition', notFound),
+  ],
+  [
+    'PATCH',
+    '/admin/positions/{id}',
+    '/admin/positions/5',
+    { auth: true, payload: { title: 'x' } },
+    resolves('updatePosition', position),
+  ],
+  ['PATCH', '/admin/positions/{id}', '/admin/positions/5', { auth: true, payload: {} }],
+  ['PATCH', '/admin/positions/{id}', '/admin/positions/5', { payload: { title: 'x' } }],
+  [
+    'PATCH',
+    '/admin/positions/{id}',
+    '/admin/positions/99',
+    { auth: true, payload: { title: 'x' } },
+    rejects('updatePosition', notFound),
+  ],
+  [
+    'DELETE',
+    '/admin/positions/{id}',
+    '/admin/positions/5',
+    { auth: true },
+    resolves('deletePosition', undefined),
+  ],
+  ['DELETE', '/admin/positions/{id}', '/admin/positions/abc', { auth: true }],
+  ['DELETE', '/admin/positions/{id}', '/admin/positions/5', {}],
+  [
+    'DELETE',
+    '/admin/positions/{id}',
+    '/admin/positions/99',
+    { auth: true },
+    rejects('deletePosition', notFound),
+  ]
+);
+
 describe('Kontrak docs/openapi.yaml', () => {
   let server;
   const exercised = new Set();

@@ -404,6 +404,14 @@ repository, tidak ada logika bisnis.
   (`PasswordHasher`, `TokenManager`) dengan implementasi di `src/infrastructure/security/`,
   sama seperti pola repository. Use-case tidak me-`require` `bcrypt`/`@hapi/jwt` langsung.
 - Waktu "sekarang" yang memengaruhi logika diinjeksi (`{ now = () => new Date() }`) agar bisa diuji.
+- Skema Joi yang dipakai lintas resource ada di `src/interfaces/http/shared/validation.js`
+  (`plainText` menolak HTML, `httpsUrl`, `yearMonth`, `idParamSchema`, `reorderPayloadSchema`).
+- Update parsial (PATCH) memakai `src/use-cases/pickDefined.js`: `undefined` = tidak diubah,
+  `null` = dikosongkan.
+- **Tes integrasi** (`test/integration/`, `npm run test:integration`) memakai database tes
+  sungguhan dari `.env` (`DATABASE_TEST_NAME`) dan menolak berjalan di database lain
+  (`assertTestDatabase()`). Data uji diberi penanda (mis. prefiks `[it] `) dan dibersihkan di
+  `afterAll`. Tidak ikut `npm test`, jadi `npm test` tetap bisa jalan tanpa database.
 
 ## 10. Ringkasan cepat
 
