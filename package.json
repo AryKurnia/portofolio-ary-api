@@ -21,28 +21,32 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "NODE_ENV=test jest",
+    "test": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest",
     "test:migrate": "NODE_ENV=test npx sequelize-cli db:migrate",
     "start": "node ./src/index.js",
     "start-dev": "nodemon ./src/index.js",
-    "test:coverage": "NODE_ENV=test jest --coverage",
+    "test:coverage": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --coverage",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:integration": "NODE_ENV=test jest --config jest.integration.config.js"
+    "test:integration": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --config jest.integration.config.js",
+    "media:cleanup": "node ./scripts/cleanup-orphan-media.js"
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
     "@hapi/hapi": "^21.4.13",
     "@hapi/jwt": "^3.2.4",
     "bcrypt": "^6.0.0",
+    "dompurify": "^3.4.17",
     "dotenv": "^17.4.2",
     "hapi-pino": "^13.0.0",
     "joi": "^18.3.2",
+    "jsdom": "^31.0.0",
     "minio": "^8.0.7",
     "mysql2": "^3.24.6",
     "pino": "^9.14.0",
-    "sequelize": "^6.37.8"
+    "sequelize": "^6.37.8",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

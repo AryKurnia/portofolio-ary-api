@@ -22,6 +22,7 @@ module.exports = [
       'src/repositories/*.js',
       'src/storages/*.js',
       'src/security/*.js',
+      'src/media/*.js',
       'migrations/*.js',
       'seeders/*.js',
     ],
