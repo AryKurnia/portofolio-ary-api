@@ -7,7 +7,7 @@ jest.mock('bcrypt');
 jest.mock('@hapi/jwt');
 
 describe('LoginUser use-case', () => {
-  const existingUser = { id: 1, email: 'aryk922@gmail.com', password: 'hashed-password-di-db' };
+  const existingUser = { id: 1, email: 'admin@example.com', password: 'hashed-password-di-db' };
   const jwtOptions = { jwtSecret: 'test-secret', jwtExpiresInSeconds: 604800 };
 
   afterEach(() => {
@@ -23,13 +23,13 @@ describe('LoginUser use-case', () => {
     const loginUser = new LoginUser(mockUserRepository, jwtOptions);
 
     // ACT
-    const result = await loginUser.execute({ email: 'aryk922@gmail.com', password: 'plain-password' });
+    const result = await loginUser.execute({ email: 'admin@example.com', password: 'plain-password' });
 
     // ASSERT
-    expect(mockUserRepository.findByEmail).toHaveBeenCalledWith('aryk922@gmail.com');
+    expect(mockUserRepository.findByEmail).toHaveBeenCalledWith('admin@example.com');
     expect(bcrypt.compare).toHaveBeenCalledWith('plain-password', 'hashed-password-di-db');
     expect(Jwt.token.generate).toHaveBeenCalledWith(
-      expect.objectContaining({ sub: '1', email: 'aryk922@gmail.com' }),
+      expect.objectContaining({ sub: '1', email: 'admin@example.com' }),
       expect.objectContaining({ key: 'test-secret', algorithm: 'HS256' }),
       { ttlSec: 604800 }
     );
@@ -57,7 +57,7 @@ describe('LoginUser use-case', () => {
     const loginUser = new LoginUser(mockUserRepository, jwtOptions);
 
     // ACT
-    const result = loginUser.execute({ email: 'aryk922@gmail.com', password: 'password-salah' });
+    const result = loginUser.execute({ email: 'admin@example.com', password: 'password-salah' });
 
     // ASSERT
     await expect(result).rejects.toThrow(AuthenticationError);
@@ -70,7 +70,7 @@ describe('LoginUser use-case', () => {
     const loginUser = new LoginUser(mockUserRepository, jwtOptions);
 
     // ACT
-    const result = loginUser.execute({ email: 'aryk922@gmail.com', password: 'apapun' });
+    const result = loginUser.execute({ email: 'admin@example.com', password: 'apapun' });
 
     // ASSERT
     await expect(result).rejects.toThrow('Database connection error');

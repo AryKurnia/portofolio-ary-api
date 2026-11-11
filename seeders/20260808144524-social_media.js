@@ -13,7 +13,7 @@ module.exports = {
         updated_at: new Date()
       },
       {
-        platform: 'linkedIn',
+        platform: 'linkedin',
         url: 'https://www.linkedin.com/in/arykurnia/',
         username: 'Ary Kurnia',
         enabled: true,
