@@ -84,12 +84,13 @@ Perintah yang dijalankan (read-only): `npm ls`, `npm outdated`, `npm audit`,
 | **M4** `POST /admin/uploads?kind=` + `DELETE /admin/uploads/{id}`: tipe dari isi file (S3), WebP multi-ukuran, EXIF dibuang, batas 36 MP, SVG disanitasi hanya untuk logo (K7, S2), object key (C5), `Cache-Control: immutable`, rollback objek bila gagal | ✅ unit (sharp/DOMPurify sungguhan) + route + kontrak |
 | **M4** gambar di respons project & profile (`image`/`photo` + varian), `PATCH /admin/profile` `photo_id` (K13), validasi jenis media | ✅ |
 | **M4** `npm run media:cleanup` (media yatim > 24 jam) | ✅ — **jadwalkan via cron** saat deploy (M7) |
-| **M4** tes integrasi MinIO (`test/integration/media.flow.test.js`, prefix `it-test/`) | ⏳ ditulis; **belum lulus karena container `minio` berhenti** (ECONNREFUSED). Juga akan memverifikasi S10 (baca anonim) |
+| **M4** tes integrasi MinIO (`test/integration/media.flow.test.js`, prefix `it-test/`) | ✅ lulus terhadap MinIO lokal; bucket bersih setelah tes. **Menemukan bug `isReferenced`** (Sequelize membuang `NOT` pada `Op.not` + literal → media yang dipakai bisa terhapus) — diperbaiki + tes repository langsung |
+| S10 kebijakan bucket MinIO **lokal** | ✅ 11 Nov 2026: semula anonim boleh `PutObject`/`DeleteObject`/`ListBucket`; pemilik mengganti ke `s3:GetObject` saja. Terverifikasi: anonim PUT/DELETE/list → 403, GET gambar tetap 200, 43 tes integrasi lulus. ⏳ MinIO di server lain (bila ada) perlu dicek dengan cara sama |
 | Endpoint lama `POST /skills/{id}/logo` | ⏳ masih memakai cara lama (MIME dari header, tanpa sanitasi SVG) sampai diganti di M5 bagian 3 |
 | Jest + jsdom 31 | `npm test` memakai `NODE_OPTIONS=--experimental-vm-modules` karena dependensi jsdom ESM-only; runtime Node 26 memuatnya native |
 | **M5 (bagian 3)** skills (kategori, urutan, `is_published`, logo via media) & social links (ganti `social_media`) — mengubah tabel/endpoint lama | ⏳ |
 | Tes unit + route + kontrak | 500 lulus, termasuk 143 skenario kontrak OpenAPI |
-| Tes integrasi `npm run test:integration` (DB tes sungguhan) | 37 lulus: repository timeline/profile/kategori/project, endpoint publik, alur auth ujung-ke-ujung, constraint skema |
+| Tes integrasi `npm run test:integration` (DB tes + MinIO sungguhan) | 43 lulus (termasuk alur media MinIO): repository timeline/profile/kategori/project, endpoint publik, alur auth ujung-ke-ujung, constraint skema |
 
 ---
 
