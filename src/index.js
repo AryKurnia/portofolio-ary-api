@@ -1,3 +1,5 @@
+require('./assertNodeVersion');
+
 const { createServer } = require('./server');
 const sequelize = require('./infrastructure/db/sequelizeClient');
 const logger = require('./infrastructure/logger');
