@@ -10,7 +10,16 @@ const schema = Joi.object({
   SERVER_PORT: Joi.number().port().default(3000),
   // Daftar origin dipisah koma, mis. "https://arykurnia.com,https://admin.arykurnia.com".
   // Kosong = CORS tidak diaktifkan (aman untuk SSR / same-origin).
-  CORS_ORIGINS: Joi.string().allow('').default(''),
+  // '*' = semua origin (hanya untuk pengembangan lokal); ditolak di production.
+  CORS_ORIGINS: Joi.string()
+    .allow('')
+    .default('')
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.string().pattern(/\*/, { invert: true }).messages({
+        'string.pattern.invert.base': 'CORS_ORIGINS tidak boleh berisi "*" di production',
+      }),
+    }),
   LOG_LEVEL: Joi.string()
     .valid('fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent')
     .default(Joi.ref('$defaultLogLevel')),
