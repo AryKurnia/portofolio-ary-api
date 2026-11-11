@@ -86,6 +86,8 @@ const createServer = async () => {
       require('./interfaces/http/auth/index'),
       require('./interfaces/http/skills/index'),
       require('./interfaces/http/social-media/index'),
+      require('./interfaces/http/profile/index'),
+      require('./interfaces/http/timeline/index'),
     ],
     { routes: { prefix: API_PREFIX } }
   );
@@ -95,6 +97,10 @@ const createServer = async () => {
     const { response } = request;
 
     if (!response.isBoom) {
+      // Data admin tidak boleh disimpan cache mana pun (API.md §9).
+      if (request.path.startsWith(`${API_PREFIX}/admin/`)) {
+        response.header('Cache-Control', 'no-store');
+      }
       return h.continue;
     }
 
