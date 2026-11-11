@@ -35,11 +35,18 @@ const schema = Joi.object({
     .required()
     .when('NODE_ENV', { is: 'production', then: Joi.string().min(32) }),
   JWT_EXPIRES_IN_SECONDS: Joi.number().integer().positive().required(),
+  // Masa berlaku refresh token (cookie). Default 7 hari.
+  REFRESH_TOKEN_TTL_SECONDS: Joi.number().integer().positive().default(604800),
+  // Atribut Secure pada cookie: wajib true di production (HTTPS); false agar bisa dicoba di http://localhost.
+  COOKIE_SECURE: Joi.boolean().default(Joi.ref('$isProduction')),
 }).unknown(true);
 
 const { value: env, error } = schema.validate(process.env, {
   abortEarly: false,
-  context: { defaultLogLevel: process.env.NODE_ENV === 'test' ? 'silent' : 'info' },
+  context: {
+    defaultLogLevel: process.env.NODE_ENV === 'test' ? 'silent' : 'info',
+    isProduction: process.env.NODE_ENV === 'production',
+  },
 });
 if (error) {
   throw new Error(`Konfigurasi env tidak valid: ${error.message}`);
@@ -71,5 +78,9 @@ module.exports = {
     expiresInSeconds: env.JWT_EXPIRES_IN_SECONDS,
     audience: 'urn:portfolio-api',
     issuer: 'portfolio-api',
+  },
+  auth: {
+    refreshTokenTtlSeconds: env.REFRESH_TOKEN_TTL_SECONDS,
+    cookieSecure: env.COOKIE_SECURE,
   },
 };

@@ -14,6 +14,7 @@ const {
 } = require('../helpers/openapi');
 const NotFoundError = require('../../src/exceptions/NotFoundError');
 const AuthenticationError = require('../../src/exceptions/AuthenticationError');
+const UnauthorizedError = require('../../src/exceptions/UnauthorizedError');
 
 const skill = {
   id: 1,
@@ -68,23 +69,65 @@ const scenarios = [
 
   [
     'POST',
-    '/auth/login',
-    '/auth/login',
-    { payload: { email: 'admin@example.com', password: 'x' } },
-    () => container.loginUser.execute.mockResolvedValue({ accessToken: 't', expiresIn: 3600 }),
+    '/admin/auth/login',
+    '/admin/auth/login',
+    { payload: { username: 'admin', password: 'x' } },
+    () =>
+      container.loginUser.execute.mockResolvedValue({
+        accessToken: 't',
+        expiresIn: 900,
+        refreshToken: 'r',
+        admin: { id: 1, username: 'admin' },
+      }),
   ],
-  ['POST', '/auth/login', '/auth/login', { payload: { email: 'bukan-email' } }],
+  ['POST', '/admin/auth/login', '/admin/auth/login', { payload: { username: 'admin' } }],
   [
     'POST',
-    '/auth/login',
-    '/auth/login',
-    { payload: { email: 'admin@example.com', password: 'x' } },
+    '/admin/auth/login',
+    '/admin/auth/login',
+    { payload: { username: 'admin', password: 'x' } },
     () =>
       container.loginUser.execute.mockRejectedValue(
-        new AuthenticationError('Invalid email or password.')
+        new AuthenticationError('Invalid username or password.')
       ),
   ],
-
+  [
+    'POST',
+    '/admin/auth/refresh',
+    '/admin/auth/refresh',
+    { headers: { cookie: 'refresh_token=r' } },
+    () =>
+      container.refreshAccessToken.execute.mockResolvedValue({
+        accessToken: 't',
+        expiresIn: 900,
+        refreshToken: 'r2',
+      }),
+  ],
+  [
+    'POST',
+    '/admin/auth/refresh',
+    '/admin/auth/refresh',
+    {},
+    () =>
+      container.refreshAccessToken.execute.mockRejectedValue(
+        new UnauthorizedError('Missing refresh token.')
+      ),
+  ],
+  [
+    'POST',
+    '/admin/auth/logout',
+    '/admin/auth/logout',
+    { headers: { cookie: 'refresh_token=r' } },
+    () => container.logoutUser.execute.mockResolvedValue(undefined),
+  ],
+  [
+    'GET',
+    '/admin/auth/me',
+    '/admin/auth/me',
+    { auth: true },
+    () => container.getCurrentAdmin.execute.mockResolvedValue({ id: 1, username: 'admin' }),
+  ],
+  ['GET', '/admin/auth/me', '/admin/auth/me', {}],
   [
     'GET',
     '/skills',

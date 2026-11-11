@@ -1,81 +1,165 @@
-const bcrypt = require('bcrypt');
-const Jwt = require('@hapi/jwt');
 const LoginUser = require('./LoginUser');
 const AuthenticationError = require('../../exceptions/AuthenticationError');
 
-jest.mock('bcrypt');
-jest.mock('@hapi/jwt');
-
 describe('LoginUser use-case', () => {
-  const existingUser = { id: 1, email: 'admin@example.com', password: 'hashed-password-di-db' };
-  const jwtOptions = { jwtSecret: 'test-secret', jwtExpiresInSeconds: 604800 };
+  const existingUser = {
+    id: 1,
+    username: 'admin',
+    email: 'admin@example.com',
+    password: 'hash-di-db',
+  };
+  const expiresAt = new Date('2026-11-18T00:00:00Z');
 
-  afterEach(() => {
-    jest.clearAllMocks();
+  const createMocks = ({
+    user = existingUser,
+    passwordValid = true,
+    needsRehash = false,
+  } = {}) => ({
+    userRepository: {
+      findByUsername: jest.fn().mockResolvedValue(user),
+      updatePasswordHash: jest.fn().mockResolvedValue(undefined),
+    },
+    refreshTokenRepository: { save: jest.fn().mockResolvedValue({ id: 10 }) },
+    passwordHasher: {
+      compare: jest.fn().mockResolvedValue(passwordValid),
+      needsRehash: jest.fn().mockReturnValue(needsRehash),
+      hash: jest.fn().mockResolvedValue('hash-baru'),
+    },
+    tokenManager: {
+      createAccessToken: jest.fn().mockReturnValue({ token: 'access-token', expiresIn: 900 }),
+      createRefreshToken: jest
+        .fn()
+        .mockReturnValue({ token: 'refresh-token', tokenHash: 'hash-refresh', expiresAt }),
+    },
   });
 
-  it('login berhasil dan mengembalikan accessToken', async () => {
-    // ARRANGE
-    const mockUserRepository = { findByEmail: jest.fn().mockResolvedValue(existingUser) };
-    bcrypt.compare.mockResolvedValue(true);
-    Jwt.token.generate.mockReturnValue('fake-jwt-token');
-
-    const loginUser = new LoginUser(mockUserRepository, jwtOptions);
-
-    // ACT
-    const result = await loginUser.execute({
-      email: 'admin@example.com',
-      password: 'plain-password',
-    });
-
-    // ASSERT
-    expect(mockUserRepository.findByEmail).toHaveBeenCalledWith('admin@example.com');
-    expect(bcrypt.compare).toHaveBeenCalledWith('plain-password', 'hashed-password-di-db');
-    expect(Jwt.token.generate).toHaveBeenCalledWith(
-      expect.objectContaining({ sub: '1', email: 'admin@example.com' }),
-      expect.objectContaining({ key: 'test-secret', algorithm: 'HS256' }),
-      { ttlSec: 604800 }
+  const createUseCase = (mocks) =>
+    new LoginUser(
+      mocks.userRepository,
+      mocks.refreshTokenRepository,
+      mocks.passwordHasher,
+      mocks.tokenManager
     );
-    expect(result).toEqual({ accessToken: 'fake-jwt-token', expiresIn: 604800 });
-  });
 
-  it('melempar AuthenticationError kalau email tidak ditemukan', async () => {
+  it('login berhasil: mengembalikan access token, refresh token, dan data admin', async () => {
     // ARRANGE
-    const mockUserRepository = { findByEmail: jest.fn().mockResolvedValue(null) };
-    const loginUser = new LoginUser(mockUserRepository, jwtOptions);
+    const mocks = createMocks();
 
     // ACT
-    const result = loginUser.execute({ email: 'tidakada@gmail.com', password: 'apapun' });
+    const result = await createUseCase(mocks).execute({ username: 'admin', password: 'rahasia' });
+
+    // ASSERT
+    expect(mocks.userRepository.findByUsername).toHaveBeenCalledWith('admin');
+    expect(mocks.passwordHasher.compare).toHaveBeenCalledWith('rahasia', 'hash-di-db');
+    expect(mocks.tokenManager.createAccessToken).toHaveBeenCalledWith(existingUser);
+    expect(mocks.refreshTokenRepository.save).toHaveBeenCalledWith({
+      userId: 1,
+      tokenHash: 'hash-refresh',
+      expiresAt,
+    });
+    expect(result).toEqual({
+      accessToken: 'access-token',
+      expiresIn: 900,
+      refreshToken: 'refresh-token',
+      refreshTokenExpiresAt: expiresAt,
+      admin: { id: 1, username: 'admin' },
+    });
+  });
+
+  it('data admin yang dikembalikan tidak memuat hash password', async () => {
+    // ACT
+    const result = await createUseCase(createMocks()).execute({ username: 'admin', password: 'x' });
+
+    // ASSERT
+    expect(JSON.stringify(result)).not.toContain('hash-di-db');
+  });
+
+  it('melempar AuthenticationError tapi tetap menjalankan compare kalau username tidak ditemukan', async () => {
+    // ARRANGE
+    const mocks = createMocks({ user: null, passwordValid: false });
+
+    // ACT
+    const result = createUseCase(mocks).execute({ username: 'tidak-ada', password: 'apapun' });
 
     // ASSERT
     await expect(result).rejects.toThrow(AuthenticationError);
-    expect(bcrypt.compare).not.toHaveBeenCalled(); // fail-fast, tidak perlu cek password kalau user tidak ada
-    expect(Jwt.token.generate).not.toHaveBeenCalled();
+    // compare dengan hash null → durasi respons sama dengan username yang ada (anti-enumerasi)
+    expect(mocks.passwordHasher.compare).toHaveBeenCalledWith('apapun', null);
+    expect(mocks.tokenManager.createAccessToken).not.toHaveBeenCalled();
+    expect(mocks.refreshTokenRepository.save).not.toHaveBeenCalled();
   });
 
-  it('melempar AuthenticationError kalau password salah', async () => {
+  it('melempar AuthenticationError dan tidak membuat token kalau password salah', async () => {
     // ARRANGE
-    const mockUserRepository = { findByEmail: jest.fn().mockResolvedValue(existingUser) };
-    bcrypt.compare.mockResolvedValue(false);
-    const loginUser = new LoginUser(mockUserRepository, jwtOptions);
+    const mocks = createMocks({ passwordValid: false });
 
     // ACT
-    const result = loginUser.execute({ email: 'admin@example.com', password: 'password-salah' });
+    const result = createUseCase(mocks).execute({ username: 'admin', password: 'salah' });
 
     // ASSERT
-    await expect(result).rejects.toThrow(AuthenticationError);
-    expect(Jwt.token.generate).not.toHaveBeenCalled();
+    await expect(result).rejects.toThrow('Invalid username or password.');
+    expect(mocks.passwordHasher.hash).not.toHaveBeenCalled();
+    expect(mocks.tokenManager.createAccessToken).not.toHaveBeenCalled();
+    expect(mocks.refreshTokenRepository.save).not.toHaveBeenCalled();
   });
 
-  it('meneruskan error kalau repository.findByEmail gagal', async () => {
+  it('meng-hash ulang password kalau cost hash lama terlalu rendah', async () => {
     // ARRANGE
-    const mockUserRepository = {
-      findByEmail: jest.fn().mockRejectedValue(new Error('Database connection error')),
-    };
-    const loginUser = new LoginUser(mockUserRepository, jwtOptions);
+    const mocks = createMocks({ needsRehash: true });
 
     // ACT
-    const result = loginUser.execute({ email: 'admin@example.com', password: 'apapun' });
+    await createUseCase(mocks).execute({ username: 'admin', password: 'rahasia' });
+
+    // ASSERT
+    expect(mocks.passwordHasher.hash).toHaveBeenCalledWith('rahasia');
+    expect(mocks.userRepository.updatePasswordHash).toHaveBeenCalledWith(1, 'hash-baru');
+  });
+
+  it('tidak meng-hash ulang password kalau cost hash sudah cukup', async () => {
+    // ARRANGE
+    const mocks = createMocks({ needsRehash: false });
+
+    // ACT
+    await createUseCase(mocks).execute({ username: 'admin', password: 'rahasia' });
+
+    // ASSERT
+    expect(mocks.userRepository.updatePasswordHash).not.toHaveBeenCalled();
+  });
+
+  it('meneruskan error kalau repository.findByUsername gagal', async () => {
+    // ARRANGE
+    const mocks = createMocks();
+    mocks.userRepository.findByUsername.mockRejectedValue(new Error('Database connection error'));
+
+    // ACT
+    const result = createUseCase(mocks).execute({ username: 'admin', password: 'x' });
+
+    // ASSERT
+    await expect(result).rejects.toThrow('Database connection error');
+  });
+
+  it('meneruskan error kalau repository.updatePasswordHash gagal', async () => {
+    // ARRANGE
+    const mocks = createMocks({ needsRehash: true });
+    mocks.userRepository.updatePasswordHash.mockRejectedValue(
+      new Error('Database connection error')
+    );
+
+    // ACT
+    const result = createUseCase(mocks).execute({ username: 'admin', password: 'x' });
+
+    // ASSERT
+    await expect(result).rejects.toThrow('Database connection error');
+    expect(mocks.refreshTokenRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('meneruskan error kalau refreshTokenRepository.save gagal', async () => {
+    // ARRANGE
+    const mocks = createMocks();
+    mocks.refreshTokenRepository.save.mockRejectedValue(new Error('Database connection error'));
+
+    // ACT
+    const result = createUseCase(mocks).execute({ username: 'admin', password: 'x' });
 
     // ASSERT
     await expect(result).rejects.toThrow('Database connection error');

@@ -74,8 +74,8 @@ const createServer = async () => {
     validate: (artifacts) => ({
       isValid: true,
       credentials: {
-        userId: artifacts.decoded.payload.sub,
-        email: artifacts.decoded.payload.email,
+        userId: Number(artifacts.decoded.payload.sub),
+        username: artifacts.decoded.payload.username,
       },
     }),
   });

@@ -5,6 +5,9 @@ const Jwt = require('@hapi/jwt');
 const USE_CASES = [
   'checkHealth',
   'loginUser',
+  'refreshAccessToken',
+  'logoutUser',
+  'getCurrentAdmin',
   'listSkills',
   'getSkill',
   'createSkill',
@@ -23,7 +26,7 @@ const createContainerMock = () =>
 const createAccessToken = () => {
   const config = require('../../src/config');
   return Jwt.token.generate(
-    { aud: config.jwt.audience, iss: config.jwt.issuer, sub: '1', email: 'admin@example.com' },
+    { aud: config.jwt.audience, iss: config.jwt.issuer, sub: '1', username: 'admin' },
     { key: config.jwt.secret, algorithm: 'HS256' },
     { ttlSec: 60 }
   );

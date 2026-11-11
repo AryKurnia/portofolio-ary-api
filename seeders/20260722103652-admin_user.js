@@ -1,22 +1,23 @@
 const bcrypt = require('bcrypt');
 
-// ADMIN_EMAIL & ADMIN_PASSWORD dibaca dari .env (dimuat oleh config/config.js saat sequelize-cli berjalan)
+// ADMIN_USERNAME, ADMIN_EMAIL & ADMIN_PASSWORD dibaca dari .env
+// (dimuat oleh config/config.js saat sequelize-cli berjalan).
+// Seeder berjalan setelah semua migrasi, termasuk penambahan kolom username.
 const BCRYPT_COST = 12;
 
-function getAdminEmail() {
-  if (!process.env.ADMIN_EMAIL) throw new Error('ADMIN_EMAIL wajib diisi untuk seeder admin');
-  return process.env.ADMIN_EMAIL;
+function requireEnv(name) {
+  if (!process.env[name]) throw new Error(`${name} wajib diisi untuk seeder admin`);
+  return process.env[name];
 }
 
 module.exports = {
   async up(queryInterface) {
-    if (!process.env.ADMIN_PASSWORD)
-      throw new Error('ADMIN_PASSWORD wajib diisi untuk seeder admin');
-    const passwordHash = await bcrypt.hash(process.env.ADMIN_PASSWORD, BCRYPT_COST);
+    const passwordHash = await bcrypt.hash(requireEnv('ADMIN_PASSWORD'), BCRYPT_COST);
 
     await queryInterface.bulkInsert('users', [
       {
-        email: getAdminEmail(),
+        username: requireEnv('ADMIN_USERNAME'),
+        email: requireEnv('ADMIN_EMAIL'),
         password_hash: passwordHash,
         created_at: new Date(),
         updated_at: new Date(),
@@ -25,6 +26,6 @@ module.exports = {
   },
 
   async down(queryInterface) {
-    await queryInterface.bulkDelete('users', { email: getAdminEmail() });
+    await queryInterface.bulkDelete('users', { username: requireEnv('ADMIN_USERNAME') });
   },
 };

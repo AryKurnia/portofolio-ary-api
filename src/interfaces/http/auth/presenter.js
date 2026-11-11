@@ -1,6 +1,13 @@
-const toLoginResponse = ({ accessToken, expiresIn }) => ({
+const toAdminResponse = ({ id, username }) => ({ id, username });
+
+const toTokenResponse = ({ accessToken, expiresIn }) => ({
   access_token: accessToken,
   expires_in: expiresIn,
 });
 
-module.exports = { toLoginResponse };
+const toLoginResponse = (result) => ({
+  ...toTokenResponse(result),
+  admin: toAdminResponse(result.admin),
+});
+
+module.exports = { toAdminResponse, toTokenResponse, toLoginResponse };

@@ -61,32 +61,41 @@ paths:
                 data: { status: error, database: unreachable }
 
   # ============================================================
-  # AUTH
+  # AUTH (admin)
   # ============================================================
-  /auth/login:
+  /admin/auth/login:
     post:
       tags: [Auth]
       summary: Login admin
-      description: Menghasilkan JWT (HS256) untuk endpoint yang membutuhkan `bearerAuth`.
+      description: |
+        Mengembalikan access token (JWT HS256) di body dan memasang refresh token di cookie
+        `refresh_token` (`HttpOnly; SameSite=Strict; Path=/api/v1/admin/auth`, `Secure` di
+        production). Refresh token tidak pernah muncul di body.
+        Pembatasan percobaan login dilakukan di reverse proxy (bukan di aplikasi).
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [email, password]
+              required: [username, password]
+              additionalProperties: false
               properties:
-                email:
+                username:
                   type: string
-                  format: email
-                  example: admin@example.com
+                  maxLength: 50
+                  example: admin
                 password:
                   type: string
                   format: password
+                  maxLength: 128
                   example: supersecret
       responses:
         '200':
           description: Login berhasil
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/RefreshTokenCookie'
           content:
             application/json:
               schema:
@@ -94,20 +103,80 @@ paths:
                 required: [data]
                 properties:
                   data:
-                    type: object
-                    required: [access_token, expires_in]
-                    properties:
-                      access_token:
-                        type: string
-                        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-                      expires_in:
-                        type: integer
-                        description: Masa berlaku token dalam detik
-                        example: 3600
+                    allOf:
+                      - $ref: '#/components/schemas/AccessToken'
+                      - type: object
+                        required: [admin]
+                        properties:
+                          admin:
+                            $ref: '#/components/schemas/Admin'
         '400':
           $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/InvalidCredentials'
+
+  /admin/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Tukar refresh token dengan access token baru
+      description: |
+        Membaca cookie `refresh_token`, merotasinya (token lama langsung dicabut), dan memasang
+        cookie baru. Memakai token yang sudah dicabut dianggap pencurian: semua sesi admin itu
+        ikut dicabut.
+      parameters:
+        - $ref: '#/components/parameters/RefreshTokenCookieParam'
+      responses:
+        '200':
+          description: Access token baru
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/RefreshTokenCookie'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AccessToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      description: Mencabut refresh token dari cookie dan menghapus cookie. Idempoten.
+      parameters:
+        - $ref: '#/components/parameters/RefreshTokenCookieParam'
+      responses:
+        '204':
+          description: Logout berhasil (juga bila tidak ada sesi)
+          headers:
+            Set-Cookie:
+              description: '`refresh_token=; Max-Age=0; ...` (menghapus cookie)'
+              schema:
+                type: string
+
+  /admin/auth/me:
+    get:
+      tags: [Auth]
+      summary: Data admin yang sedang login
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Data admin
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Admin'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   # ============================================================
   # SKILLS
@@ -316,7 +385,20 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  headers:
+    RefreshTokenCookie:
+      description: '`refresh_token=<token>; Max-Age=604800; Path=/api/v1/admin/auth; HttpOnly; SameSite=Strict` (+ `Secure` di production)'
+      schema:
+        type: string
+
   parameters:
+    RefreshTokenCookieParam:
+      name: refresh_token
+      in: cookie
+      required: false
+      description: Diisi otomatis oleh browser dari login/refresh sebelumnya
+      schema:
+        type: string
     IdParam:
       name: id
       in: path
@@ -384,7 +466,7 @@ components:
               details:
                 - { field: email, message: email must be a valid email }
     Unauthorized:
-      description: Token tidak ada, kedaluwarsa, atau tidak valid (`UNAUTHORIZED`)
+      description: Access token atau refresh token tidak ada, kedaluwarsa, atau tidak valid (`UNAUTHORIZED`)
       content:
         application/json:
           schema:
@@ -392,13 +474,13 @@ components:
           example:
             error: { code: UNAUTHORIZED, message: Missing or invalid access token. }
     InvalidCredentials:
-      description: Email atau password salah (`INVALID_CREDENTIALS`)
+      description: Username atau password salah (`INVALID_CREDENTIALS`)
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
           example:
-            error: { code: INVALID_CREDENTIALS, message: Invalid email or password. }
+            error: { code: INVALID_CREDENTIALS, message: Invalid username or password. }
     NotFound:
       description: Resource tidak ditemukan (`NOT_FOUND`)
       content:
@@ -478,6 +560,30 @@ components:
             database:
               type: string
               enum: [ok, unreachable]
+
+    AccessToken:
+      type: object
+      required: [access_token, expires_in]
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        expires_in:
+          type: integer
+          description: Masa berlaku access token dalam detik
+          example: 900
+
+    Admin:
+      type: object
+      required: [id, username]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: admin
 
     PaginationMeta:
       type: object
