@@ -21,9 +21,16 @@ const updateSkillPayloadSchema = Joi.object({
   enabled: Joi.boolean().required(),
 });
 
+// Payload multipart berupa stream: cukup pastikan field `logo` ada.
+// Joi.any() dipakai agar stream tidak di-clone/diubah oleh Joi.
+const uploadLogoPayloadSchema = Joi.object({
+  logo: Joi.any().required(),
+}).unknown(true);
+
 module.exports = {
   idParamSchema,
   listQuerySchema,
   createSkillPayloadSchema,
   updateSkillPayloadSchema,
+  uploadLogoPayloadSchema,
 };

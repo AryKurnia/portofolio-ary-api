@@ -5,6 +5,7 @@ const {
   listQuerySchema,
   createSkillPayloadSchema,
   updateSkillPayloadSchema,
+  uploadLogoPayloadSchema,
 } = require('./validator');
 
 module.exports = [
@@ -59,7 +60,7 @@ module.exports = [
         maxBytes: 2 * 1024 * 1024, // 2MB
         allow: 'multipart/form-data',
       },
-      validate: { params: idParamSchema },
+      validate: { params: idParamSchema, payload: uploadLogoPayloadSchema },
     },
     handler: handler.uploadLogo,
   },

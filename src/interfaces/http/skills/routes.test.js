@@ -147,6 +147,75 @@ describe('HTTP routes /api/v1/skills', () => {
     expect(response.result.data.id).toBe(2);
   });
 
+  const multipartBody = (boundary, { field = 'logo', filename = 'logo.png', type, content }) =>
+    Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="${field}"; filename="${filename}"\r\n` +
+          `Content-Type: ${type}\r\n\r\n`
+      ),
+      Buffer.from(content),
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+
+  it('POST /skills/{id}/logo meneruskan isi file ke use-case dan mengembalikan 200', async () => {
+    // ARRANGE
+    container.uploadSkillLogo.execute.mockResolvedValue(skill);
+    const boundary = 'batas-tes';
+
+    // ACT
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/v1/skills/1/logo',
+      headers: { ...authHeader(), 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: multipartBody(boundary, { type: 'image/png', content: 'isi-png-palsu' }),
+    });
+
+    // ASSERT
+    expect(response.statusCode).toBe(200);
+    expect(container.uploadSkillLogo.execute).toHaveBeenCalledWith({
+      id: 1,
+      buffer: Buffer.from('isi-png-palsu'),
+      filename: 'logo.png',
+      mimeType: 'image/png',
+    });
+  });
+
+  it('POST /skills/{id}/logo mengembalikan 400 (bukan 500) kalau field logo tidak dikirim', async () => {
+    // ARRANGE
+    const boundary = 'batas-tes';
+
+    // ACT
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/v1/skills/1/logo',
+      headers: { ...authHeader(), 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: multipartBody(boundary, { field: 'gambar', type: 'image/png', content: 'x' }),
+    });
+
+    // ASSERT
+    expect(response.statusCode).toBe(400);
+    expect(response.result.error.details).toEqual([{ field: 'logo', message: 'logo is required' }]);
+    expect(container.uploadSkillLogo.execute).not.toHaveBeenCalled();
+  });
+
+  it('POST /skills/{id}/logo mengembalikan 415 untuk tipe file yang tidak diizinkan', async () => {
+    // ARRANGE
+    const boundary = 'batas-tes';
+
+    // ACT
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/v1/skills/1/logo',
+      headers: { ...authHeader(), 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: multipartBody(boundary, { filename: 'logo.gif', type: 'image/gif', content: 'x' }),
+    });
+
+    // ASSERT
+    expect(response.statusCode).toBe(415);
+    expect(response.result.error.code).toBe('UNSUPPORTED_MEDIA_TYPE');
+    expect(container.uploadSkillLogo.execute).not.toHaveBeenCalled();
+  });
+
   it('POST /skills/{id}/logo mengembalikan 413 PAYLOAD_TOO_LARGE untuk file di atas 2 MB', async () => {
     // ARRANGE
     const boundary = 'batas-tes';
