@@ -1,19 +1,25 @@
-require('dotenv').config();
+// Dipakai oleh sequelize-cli (migrasi/seeder) dan src/infrastructure/db/sequelizeClient.js.
+require('dotenv').config({ quiet: true });
+
+const base = {
+  username: process.env.DATABASE_USER,
+  password: process.env.DATABASE_PASSWORD,
+  host: process.env.DATABASE_HOST,
+  dialect: 'mysql',
+  seederStorage: 'sequelize',
+};
 
 module.exports = {
   development: {
-    username: process.env.DATABASE_USER,
-    password: process.env.DATABASE_PASSWORD,
+    ...base,
     database: process.env.DATABASE_NAME,
-    host: process.env.DATABASE_HOST,
-    dialect: 'mysql',
-    seederStorage: 'sequelize',
   },
   test: {
-    username: process.env.DATABASE_USER,
-    password: process.env.DATABASE_PASSWORD,
+    ...base,
     database: process.env.DATABASE_TEST_NAME,
-    host: process.env.DATABASE_HOST,
-    dialect: 'mysql',
+  },
+  production: {
+    ...base,
+    database: process.env.DATABASE_NAME,
   },
 };

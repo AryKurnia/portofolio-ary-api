@@ -10,110 +10,108 @@ describe('DeleteSkill use-case', () => {
     enabled: true,
   };
 
+  const createMocks = ({ skill = existingSkill } = {}) => ({
+    skillRepository: {
+      findById: jest.fn().mockResolvedValue(skill),
+      delete: jest.fn().mockResolvedValue(true),
+    },
+    fileStorage: { delete: jest.fn().mockResolvedValue(true) },
+    logger: { warn: jest.fn() },
+  });
+
+  const createUseCase = ({ skillRepository, fileStorage, logger }) =>
+    new DeleteSkill(skillRepository, fileStorage, logger);
+
   it('menghapus skill yang ada', async () => {
     // ARRANGE
-    const mockSkillRepository = {
-      findById: jest.fn().mockResolvedValue(existingSkill),
-      delete: jest.fn().mockResolvedValue(true),
-    };
-    const mockFileStorage = {
-      delete: jest.fn().mockResolvedValue(true),
-    };
+    const mocks = createMocks();
 
     // ACT
-    await new DeleteSkill(mockSkillRepository, mockFileStorage).execute(1);
+    await createUseCase(mocks).execute(1);
 
     // ASSERT
-    expect(mockSkillRepository.findById).toHaveBeenCalledWith(1);
-    expect(mockSkillRepository.delete).toHaveBeenCalledWith(1);
+    expect(mocks.skillRepository.findById).toHaveBeenCalledWith(1);
+    expect(mocks.skillRepository.delete).toHaveBeenCalledWith(1);
   });
 
   it('menghapus logo dari storage juga saat skill punya logoUrl', async () => {
     // ARRANGE
-    const mockSkillRepository = {
-      findById: jest.fn().mockResolvedValue(existingSkill),
-      delete: jest.fn().mockResolvedValue(true),
-    };
-    const mockFileStorage = {
-      delete: jest.fn().mockResolvedValue(true),
-    };
+    const mocks = createMocks();
 
     // ACT
-    await new DeleteSkill(mockSkillRepository, mockFileStorage).execute(1);
+    await createUseCase(mocks).execute(1);
 
     // ASSERT
-    expect(mockFileStorage.delete).toHaveBeenCalledWith('https://minio.../1.jpg');
+    expect(mocks.fileStorage.delete).toHaveBeenCalledWith('https://minio.../1.jpg');
+  });
+
+  it('menghapus data di database sebelum menghapus logo di storage', async () => {
+    // ARRANGE
+    const mocks = createMocks();
+
+    // ACT
+    await createUseCase(mocks).execute(1);
+
+    // ASSERT
+    const repositoryDeleteOrder = mocks.skillRepository.delete.mock.invocationCallOrder[0];
+    const storageDeleteOrder = mocks.fileStorage.delete.mock.invocationCallOrder[0];
+    expect(repositoryDeleteOrder).toBeLessThan(storageDeleteOrder);
   });
 
   it('tidak memanggil fileStorage.delete kalau skill tidak punya logoUrl', async () => {
     // ARRANGE
-    const skillWithoutLogo = { ...existingSkill, logoUrl: null };
-    const mockSkillRepository = {
-      findById: jest.fn().mockResolvedValue(skillWithoutLogo),
-      delete: jest.fn().mockResolvedValue(true),
-    };
-    const mockFileStorage = {
-      delete: jest.fn().mockResolvedValue(true),
-    };
+    const mocks = createMocks({ skill: { ...existingSkill, logoUrl: null } });
 
     // ACT
-    await new DeleteSkill(mockSkillRepository, mockFileStorage).execute(1);
+    await createUseCase(mocks).execute(1);
 
     // ASSERT
-    expect(mockFileStorage.delete).not.toHaveBeenCalled();
-    expect(mockSkillRepository.delete).toHaveBeenCalledWith(1);
+    expect(mocks.fileStorage.delete).not.toHaveBeenCalled();
+    expect(mocks.skillRepository.delete).toHaveBeenCalledWith(1);
   });
 
   it('melempar NotFoundError kalau skill tidak ditemukan', async () => {
     // ARRANGE
-    const mockSkillRepository = {
-      findById: jest.fn().mockResolvedValue(null),
-      delete: jest.fn(),
-    };
-    const mockFileStorage = { delete: jest.fn() };
+    const mocks = createMocks({ skill: null });
 
     // ACT
-    const result = new DeleteSkill(mockSkillRepository, mockFileStorage).execute(99);
+    const result = createUseCase(mocks).execute(99);
 
     // ASSERT
     await expect(result).rejects.toThrow(NotFoundError);
-    expect(mockFileStorage.delete).not.toHaveBeenCalled();
-    expect(mockSkillRepository.delete).not.toHaveBeenCalled();
+    expect(mocks.skillRepository.delete).not.toHaveBeenCalled();
+    expect(mocks.fileStorage.delete).not.toHaveBeenCalled();
   });
 
-  it('meneruskan error kalau fileStorage.delete gagal', async () => {
+  it('meneruskan error dan tidak menghapus logo kalau repository.delete gagal', async () => {
     // ARRANGE
-    const mockSkillRepository = {
-      findById: jest.fn().mockResolvedValue(existingSkill),
-      delete: jest.fn(),
-    };
-    const mockFileStorage = {
-      delete: jest.fn().mockRejectedValue(new Error('MinIO connection error')),
-    };
+    const mocks = createMocks();
+    mocks.skillRepository.delete.mockRejectedValue(new Error('Database connection error'));
 
     // ACT
-    const result = new DeleteSkill(mockSkillRepository, mockFileStorage).execute(1);
-
-    // ASSERT
-    await expect(result).rejects.toThrow('MinIO connection error');
-    // kalau hapus file gagal, jangan lanjut hapus data dari database
-    expect(mockSkillRepository.delete).not.toHaveBeenCalled();
-  });
-
-  it('meneruskan error kalau repository.delete gagal', async () => {
-    // ARRANGE
-    const mockSkillRepository = {
-      findById: jest.fn().mockResolvedValue(existingSkill),
-      delete: jest.fn().mockRejectedValue(new Error('Database connection error')),
-    };
-    const mockFileStorage = {
-      delete: jest.fn().mockResolvedValue(true),
-    };
-
-    // ACT
-    const result = new DeleteSkill(mockSkillRepository, mockFileStorage).execute(1);
+    const result = createUseCase(mocks).execute(1);
 
     // ASSERT
     await expect(result).rejects.toThrow('Database connection error');
+    // data masih ada, jadi logonya harus tetap utuh
+    expect(mocks.fileStorage.delete).not.toHaveBeenCalled();
+  });
+
+  it('tetap berhasil dan mencatat warning kalau fileStorage.delete gagal', async () => {
+    // ARRANGE
+    const mocks = createMocks();
+    const storageError = new Error('MinIO connection error');
+    mocks.fileStorage.delete.mockRejectedValue(storageError);
+
+    // ACT
+    const result = createUseCase(mocks).execute(1);
+
+    // ASSERT
+    await expect(result).resolves.toBeUndefined();
+    expect(mocks.skillRepository.delete).toHaveBeenCalledWith(1);
+    expect(mocks.logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ err: storageError, skillId: 1 }),
+      expect.any(String)
+    );
   });
 });

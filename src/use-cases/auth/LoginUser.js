@@ -12,12 +12,12 @@ class LoginUser {
   async execute({ email, password }) {
     const user = await this._userRepository.findByEmail(email);
     if (!user) {
-      throw new AuthenticationError('Email atau password salah');
+      throw new AuthenticationError('Invalid email or password.');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new AuthenticationError('Email atau password salah');
+      throw new AuthenticationError('Invalid email or password.');
     }
 
     const accessToken = Jwt.token.generate(

@@ -9,7 +9,7 @@ class UpdateSkill {
   async execute(id, { name, description, enabled }) {
     const existingSkill = await this._skillRepository.findById(id);
     if (!existingSkill) {
-      throw new NotFoundError(`Skill dengan id ${id} tidak ditemukan`);
+      throw new NotFoundError(`Skill with id ${id} was not found.`);
     }
 
     const updatedSkill = new Skill({

@@ -8,7 +8,7 @@ class GetSocialMediaByPlatform {
   async execute(platform) {
     const result = await this._socialMediaRepository.findByPlatform(platform);
     if (!result) {
-      throw new NotFoundError(`Social media dengan platform ${platform} tidak ditemukan`);
+      throw new NotFoundError(`Social media for platform ${platform} was not found.`);
     }
     return result;
   }
