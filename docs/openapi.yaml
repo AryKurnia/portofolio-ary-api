@@ -39,6 +39,7 @@ tags:
   - name: Timeline
   - name: Skill Categories
   - name: Projects
+  - name: Uploads
 
 security: []
 
@@ -913,7 +914,7 @@ paths:
       summary: Tambah project
       description: |
         `show_button` default mengikuti ada/tidaknya `link_url`; `is_published` default true.
-        Project terbit wajib punya `image_id` yang ada (upload gambar: M4).
+        Project terbit wajib punya `image_id` hasil upload `kind=project_image`.
       security:
         - bearerAuth: []
       requestBody:
@@ -1003,6 +1004,84 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # UPLOADS (admin)
+  # ============================================================
+  /admin/uploads:
+    post:
+      tags: [Uploads]
+      summary: Unggah gambar (langkah 1 dari 2 — lalu kirim id-nya di form resource)
+      description: |
+        Jenis file ditentukan dari ISI file, bukan dari header `Content-Type` klien.
+        - `project_image`, `profile_photo`: PNG/JPEG/WebP → WebP (400/800/1200 atau 400/800 px),
+          orientasi EXIF diterapkan, metadata dibuang.
+        - `skill_logo`: PNG/JPEG/WebP → WebP 128/256 px, atau SVG yang disanitasi (tetap vektor).
+        Maksimal 2 MB dan 36 megapiksel. Objek disajikan dengan `Cache-Control: immutable`.
+        Upload yang tidak dipakai dihapus oleh `npm run media:cleanup` setelah 24 jam.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [project_image, skill_logo, profile_photo]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201':
+          description: Gambar tersimpan
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/Image'
+                      - type: object
+                        required: [kind]
+                        properties:
+                          kind: { type: string, enum: [project_image, skill_logo, profile_photo] }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+
+  /admin/uploads/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    delete:
+      tags: [Uploads]
+      summary: Hapus gambar yang tidak dipakai
+      description: Ditolak 409 bila gambar masih dipakai project atau profil.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Gambar terhapus
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
 # ============================================================
 # COMPONENTS
@@ -1284,7 +1363,7 @@ components:
 
     Profile:
       type: object
-      required: [greeting, tagline, about, project_intro, email, updated_at]
+      required: [greeting, tagline, about, project_intro, email, photo, updated_at]
       additionalProperties: false
       properties:
         greeting: { type: string, maxLength: 80, example: "Hi, I'm Ary Kurnia" }
@@ -1292,6 +1371,7 @@ components:
         about: { type: string, maxLength: 1000 }
         project_intro: { type: [string, 'null'], maxLength: 200 }
         email: { type: string, format: email }
+        photo: { $ref: '#/components/schemas/NullableImage' }
         updated_at: { type: string, format: date-time }
 
     ProfileUpdateInput:
@@ -1304,6 +1384,10 @@ components:
         about: { type: string, maxLength: 1000 }
         project_intro: { type: [string, 'null'], maxLength: 200 }
         email: { type: string, format: email, maxLength: 254 }
+        photo_id:
+          type: [integer, 'null']
+          minimum: 1
+          description: id hasil upload kind=profile_photo; null menghapus foto
 
     OrganizationGroup:
       type: string
@@ -1450,16 +1534,15 @@ components:
 
     Project:
       type: object
-      required: [id, title, description, image_id, link_url, show_button, is_published, sort_order,
+      required: [id, title, description, image_id, image, link_url, show_button, is_published, sort_order,
                  created_at, updated_at]
       additionalProperties: false
       properties:
         id: { type: integer }
         title: { type: string, maxLength: 60, example: FitAI Coach }
         description: { type: string, maxLength: 300 }
-        image_id:
-          type: [integer, 'null']
-          description: id media; URL gambar ditambahkan di M4
+        image_id: { type: [integer, 'null'] }
+        image: { $ref: '#/components/schemas/NullableImage' }
         link_url: { type: [string, 'null'], format: uri }
         show_button: { type: boolean }
         is_published: { type: boolean }
@@ -1472,7 +1555,10 @@ components:
       properties:
         title: { type: string, maxLength: 60 }
         description: { type: string, maxLength: 300 }
-        image_id: { type: [integer, 'null'], minimum: 1 }
+        image_id:
+          type: [integer, 'null']
+          minimum: 1
+          description: id hasil upload kind=project_image
         link_url:
           type: [string, 'null']
           format: uri
@@ -1499,7 +1585,7 @@ components:
 
     PublicProfile:
       type: object
-      required: [greeting, tagline, about, project_intro, email]
+      required: [greeting, tagline, about, project_intro, email, photo]
       additionalProperties: false
       properties:
         greeting: { type: string }
@@ -1507,16 +1593,17 @@ components:
         about: { type: string }
         project_intro: { type: [string, 'null'] }
         email: { type: string, format: email }
+        photo: { $ref: '#/components/schemas/NullableImage' }
 
     PublicProject:
       type: object
-      required: [id, title, description, link_url, show_button]
+      required: [id, title, description, image, link_url, show_button]
       additionalProperties: false
-      description: Gambar (URL + varian ukuran) ditambahkan bersama fitur upload (M4).
       properties:
         id: { type: integer }
         title: { type: string }
         description: { type: string }
+        image: { $ref: '#/components/schemas/NullableImage' }
         link_url: { type: [string, 'null'], format: uri }
         show_button: { type: boolean }
 
@@ -1574,6 +1661,28 @@ components:
         platform: { type: string, example: github }
         label: { type: string, example: GitHub }
         url: { type: string, format: uri }
+
+    Image:
+      type: object
+      required: [id, url, width, height, mime, variants]
+      properties:
+        id: { type: integer, description: Dipakai sebagai image_id / photo_id }
+        url: { type: string, format: uri, description: Versi utama (terbesar) }
+        width: { type: [integer, 'null'], description: Lebar gambar asli }
+        height: { type: [integer, 'null'] }
+        mime: { type: string, enum: [image/webp, image/svg+xml] }
+        variants:
+          type: object
+          description: 'Lebar (px) → URL, untuk srcset. SVG hanya punya "original".'
+          additionalProperties: { type: string, format: uri }
+          example:
+            '400': https://minio.example.com/portfolio/project_image/6f1c-400.webp
+            '800': https://minio.example.com/portfolio/project_image/6f1c-800.webp
+
+    NullableImage:
+      oneOf:
+        - $ref: '#/components/schemas/Image'
+        - type: 'null'
 
     PaginationMeta:
       type: object

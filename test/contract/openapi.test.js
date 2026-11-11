@@ -741,6 +741,99 @@ scenarios.push(
   ['GET', '/social-links', '/social-links', {}, resolves('listPublicSocialLinks', publicSocial)]
 );
 
+// --- Uploads (M4) ---
+const UnsupportedMediaTypeError = require('../../src/exceptions/UnsupportedMediaTypeError');
+const uploadedMedia = {
+  id: 3,
+  kind: 'project_image',
+  objectKey: 'project_image/u-800.webp',
+  mime: 'image/webp',
+  width: 1600,
+  height: 900,
+  variants: { 400: 'project_image/u-400.webp', 800: 'project_image/u-800.webp' },
+};
+const fileUpload = (sizeBytes = 10) => {
+  const boundary = 'batas-kontrak-upload';
+  return {
+    headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+    payload: Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="f"\r\nContent-Type: image/png\r\n\r\n`
+      ),
+      Buffer.alloc(sizeBytes, 'a'),
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]),
+  };
+};
+
+scenarios.push(
+  [
+    'POST',
+    '/admin/uploads',
+    '/admin/uploads?kind=project_image',
+    { auth: true, ...fileUpload() },
+    resolves('uploadMedia', uploadedMedia),
+  ],
+  ['POST', '/admin/uploads', '/admin/uploads?kind=avatar', { auth: true, ...fileUpload() }],
+  ['POST', '/admin/uploads', '/admin/uploads?kind=project_image', fileUpload()],
+  [
+    'POST',
+    '/admin/uploads',
+    '/admin/uploads?kind=project_image',
+    { auth: true, ...fileUpload(2 * 1024 * 1024 + 1) },
+  ],
+  [
+    'POST',
+    '/admin/uploads',
+    '/admin/uploads?kind=project_image',
+    { auth: true, ...fileUpload() },
+    rejects('uploadMedia', () =>
+      Promise.reject(new UnsupportedMediaTypeError('Use PNG, JPG or WebP.'))
+    ),
+  ],
+  [
+    'DELETE',
+    '/admin/uploads/{id}',
+    '/admin/uploads/3',
+    { auth: true },
+    resolves('deleteMedia', undefined),
+  ],
+  ['DELETE', '/admin/uploads/{id}', '/admin/uploads/abc', { auth: true }],
+  ['DELETE', '/admin/uploads/{id}', '/admin/uploads/3', {}],
+  [
+    'DELETE',
+    '/admin/uploads/{id}',
+    '/admin/uploads/99',
+    { auth: true },
+    rejects('deleteMedia', notFound),
+  ],
+  [
+    'DELETE',
+    '/admin/uploads/{id}',
+    '/admin/uploads/3',
+    { auth: true },
+    rejects('deleteMedia', conflict),
+  ],
+  // gambar terisi pada project & profil (bukan hanya null)
+  [
+    'GET',
+    '/projects',
+    '/projects',
+    {},
+    resolves('listPublishedProjects', {
+      data: [{ ...project, image: uploadedMedia }],
+      meta: { page: 1, limit: 12, total: 1 },
+    }),
+  ],
+  [
+    'GET',
+    '/admin/profile',
+    '/admin/profile',
+    { auth: true },
+    resolves('getProfile', { ...profile, photo: { ...uploadedMedia, kind: 'profile_photo' } }),
+  ]
+);
+
 describe('Kontrak docs/openapi.yaml', () => {
   let server;
   const exercised = new Set();

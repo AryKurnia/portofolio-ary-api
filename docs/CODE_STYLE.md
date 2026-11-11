@@ -404,6 +404,12 @@ repository, tidak ada logika bisnis.
   (`PasswordHasher`, `TokenManager`) dengan implementasi di `src/infrastructure/security/`,
   sama seperti pola repository. Use-case tidak me-`require` `bcrypt`/`@hapi/jwt` langsung.
 - Waktu "sekarang" yang memengaruhi logika diinjeksi (`{ now = () => new Date() }`) agar bisa diuji.
+- Pemrosesan gambar memakai interface `src/media/ImageProcessor.js` (implementasi
+  `src/infrastructure/media/SharpImageProcessor.js`). Jenis file SELALU ditentukan dari isi file,
+  tidak pernah dari header/ekstensi klien.
+- Container hanya mengekspor use-case, dengan satu pengecualian: `mediaUrlFor(key)` (fungsi murni
+  object key → URL publik) yang dipakai presenter lewat `src/interfaces/http/shared/media.js`.
+- Simpan *object key* di database, bukan URL penuh; URL dibentuk saat respons.
 - Skema Joi yang dipakai lintas resource ada di `src/interfaces/http/shared/validation.js`
   (`plainText` menolak HTML, `httpsUrl`, `yearMonth`, `idParamSchema`, `reorderPayloadSchema`).
 - Update parsial (PATCH) memakai `src/use-cases/pickDefined.js`: `undefined` = tidak diubah,

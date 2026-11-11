@@ -81,8 +81,14 @@ Perintah yang dijalankan (read-only): `npm ls`, `npm outdated`, `npm audit`,
 | **M5 (bagian 2)** admin projects: CRUD + reorder + paginasi; `show_button` ⇒ link https, terbit ⇒ `image_id` yang ada | ✅ — URL gambar & varian menyusul di M4; project baru bisa terbit setelah upload tersedia |
 | **M6** publik: `GET /portfolio`, `/profile`, `/projects`, `/projects/{id}`, `/timeline`, `/social-links` — hanya data terbit; `Cache-Control` publik + `ETag`/304 | ✅ — `skills` per kategori di `/portfolio` menyusul bagian 3; gambar project menyusul M4; social links sementara dari `social_media` (hanya yang aktif, platform dinormalkan huruf kecil) |
 | S7 data non-publik bocor di endpoint publik | ✅ untuk endpoint baru; endpoint lama `/skills` & `/profile/social-media` masih menampilkan yang nonaktif sampai diganti di bagian 3 |
+| **M4** `POST /admin/uploads?kind=` + `DELETE /admin/uploads/{id}`: tipe dari isi file (S3), WebP multi-ukuran, EXIF dibuang, batas 36 MP, SVG disanitasi hanya untuk logo (K7, S2), object key (C5), `Cache-Control: immutable`, rollback objek bila gagal | ✅ unit (sharp/DOMPurify sungguhan) + route + kontrak |
+| **M4** gambar di respons project & profile (`image`/`photo` + varian), `PATCH /admin/profile` `photo_id` (K13), validasi jenis media | ✅ |
+| **M4** `npm run media:cleanup` (media yatim > 24 jam) | ✅ — **jadwalkan via cron** saat deploy (M7) |
+| **M4** tes integrasi MinIO (`test/integration/media.flow.test.js`, prefix `it-test/`) | ⏳ ditulis; **belum lulus karena container `minio` berhenti** (ECONNREFUSED). Juga akan memverifikasi S10 (baca anonim) |
+| Endpoint lama `POST /skills/{id}/logo` | ⏳ masih memakai cara lama (MIME dari header, tanpa sanitasi SVG) sampai diganti di M5 bagian 3 |
+| Jest + jsdom 31 | `npm test` memakai `NODE_OPTIONS=--experimental-vm-modules` karena dependensi jsdom ESM-only; runtime Node 26 memuatnya native |
 | **M5 (bagian 3)** skills (kategori, urutan, `is_published`, logo via media) & social links (ganti `social_media`) — mengubah tabel/endpoint lama | ⏳ |
-| Tes unit + route + kontrak | 427 lulus (41 suite), termasuk 131 skenario kontrak OpenAPI |
+| Tes unit + route + kontrak | 500 lulus, termasuk 143 skenario kontrak OpenAPI |
 | Tes integrasi `npm run test:integration` (DB tes sungguhan) | 37 lulus: repository timeline/profile/kategori/project, endpoint publik, alur auth ujung-ke-ujung, constraint skema |
 
 ---
