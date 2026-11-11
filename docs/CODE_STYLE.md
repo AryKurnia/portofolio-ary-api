@@ -396,6 +396,10 @@ repository, tidak ada logika bisnis.
   `jest.mock(..., () => require('<root>/test/helpers/http').createContainerMock())`, token
   dari `authHeader()`. Env palsu dipasang otomatis oleh `test/setupEnv.js`. Use-case baru
   wajib ditambahkan ke daftar `USE_CASES` di `test/helpers/http.js`.
+- **Setiap endpoint/status baru wajib** didokumentasikan di `docs/openapi.yaml` dan diberi
+  skenario di `test/contract/openapi.test.js`. Tes kontrak gagal bila route tidak
+  terdokumentasi, body tidak cocok skema, atau ada status terdokumentasi yang tidak diuji.
+  `docs/openapi.yaml` hanya memuat endpoint yang sudah ada — rencana tetap di `docs/design/API.md`.
 
 ## 10. Ringkasan cepat
 

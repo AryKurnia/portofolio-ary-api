@@ -60,8 +60,10 @@ Perintah yang dijalankan (read-only): `npm ls`, `npm outdated`, `npm audit`,
 | **M1** envelope `{ data }`, presenter snake_case eksplisit (K4) — juga menutup C9 untuk resource yang ada | ✅ |
 | **M1** format error `{ error: { code, message, details? } }`, `ClientError`, `failAction` per field, pesan Inggris (K10) | ✅ |
 | **M1** CORS via `CORS_ORIGINS` (kosong = mati), `GET /api/v1/health` (503 bila DB mati), `hapi-pino` + `redact`, logger di `DeleteSkill` | ✅ |
-| Tes | 74 lulus: use-case + route semua plugin + perilaku lintas route (404, 500 tidak bocor, header, CORS, 413) |
-| `docs/openapi.yaml` | ⏳ belum disinkronkan dengan format baru — dijadwalkan M7 |
+| Tes | 114 lulus (termasuk 37 tes kontrak OpenAPI); M1 sendiri 74: use-case + route semua plugin + perilaku lintas route (404, 500 tidak bocor, header, CORS, 413) |
+| C11 `docs/openapi.yaml` disinkronkan (hanya endpoint yang ada, snake_case, format error baru) | ✅ dijaga tes kontrak `test/contract/openapi.test.js`: route↔dokumen, skema respons, dan cakupan setiap status |
+| Bug baru: upload logo tanpa field `logo` → 500 | ✅ jadi 400 `VALIDATION_ERROR` (validasi payload multipart) + tes regresi |
+| Lint Redocly untuk `openapi.yaml` | ⏳ belum dijalankan (unduhan paket eksternal ditolak di sesi ini) — jalankan manual: `npx @redocly/cli lint docs/openapi.yaml` |
 
 ---
 
