@@ -88,6 +88,8 @@ const createServer = async () => {
       require('./interfaces/http/social-media/index'),
       require('./interfaces/http/profile/index'),
       require('./interfaces/http/timeline/index'),
+      require('./interfaces/http/skill-categories/index'),
+      require('./interfaces/http/projects/index'),
     ],
     { routes: { prefix: API_PREFIX } }
   );

@@ -11,6 +11,9 @@ const MariaDBRefreshTokenRepository = require('../repositories/mariadb/MariaDBRe
 const MariaDBProfileRepository = require('../repositories/mariadb/MariaDBProfileRepository');
 const MariaDBOrganizationRepository = require('../repositories/mariadb/MariaDBOrganizationRepository');
 const MariaDBPositionRepository = require('../repositories/mariadb/MariaDBPositionRepository');
+const MariaDBSkillCategoryRepository = require('../repositories/mariadb/MariaDBSkillCategoryRepository');
+const MariaDBProjectRepository = require('../repositories/mariadb/MariaDBProjectRepository');
+const MariaDBMediaRepository = require('../repositories/mariadb/MariaDBMediaRepository');
 
 // Security
 const BcryptPasswordHasher = require('./security/BcryptPasswordHasher');
@@ -45,6 +48,21 @@ const UpdatePosition = require('../use-cases/timeline/UpdatePosition');
 const DeletePosition = require('../use-cases/timeline/DeletePosition');
 const ReorderPositions = require('../use-cases/timeline/ReorderPositions');
 
+// Skill categories
+const ListSkillCategories = require('../use-cases/skill-category/ListSkillCategories');
+const CreateSkillCategory = require('../use-cases/skill-category/CreateSkillCategory');
+const UpdateSkillCategory = require('../use-cases/skill-category/UpdateSkillCategory');
+const DeleteSkillCategory = require('../use-cases/skill-category/DeleteSkillCategory');
+const ReorderSkillCategories = require('../use-cases/skill-category/ReorderSkillCategories');
+
+// Projects
+const ListProjects = require('../use-cases/project/ListProjects');
+const GetProject = require('../use-cases/project/GetProject');
+const CreateProject = require('../use-cases/project/CreateProject');
+const UpdateProject = require('../use-cases/project/UpdateProject');
+const DeleteProject = require('../use-cases/project/DeleteProject');
+const ReorderProjects = require('../use-cases/project/ReorderProjects');
+
 // Media Social
 const ListSocialMedia = require('../use-cases/social-media/ListSocialMedia');
 const GetSocialMediaByPlatform = require('../use-cases/social-media/GetSocialMediaByPlatform');
@@ -66,6 +84,9 @@ const refreshTokenRepository = new MariaDBRefreshTokenRepository();
 const profileRepository = new MariaDBProfileRepository();
 const organizationRepository = new MariaDBOrganizationRepository();
 const positionRepository = new MariaDBPositionRepository();
+const skillCategoryRepository = new MariaDBSkillCategoryRepository();
+const projectRepository = new MariaDBProjectRepository();
+const mediaRepository = new MariaDBMediaRepository();
 const passwordHasher = new BcryptPasswordHasher();
 const tokenManager = new JwtTokenManager({
   secret: config.jwt.secret,
@@ -96,6 +117,19 @@ module.exports = {
   updatePosition: new UpdatePosition(organizationRepository, positionRepository),
   deletePosition: new DeletePosition(positionRepository),
   reorderPositions: new ReorderPositions(organizationRepository, positionRepository),
+  // Skill categories
+  listSkillCategories: new ListSkillCategories(skillCategoryRepository),
+  createSkillCategory: new CreateSkillCategory(skillCategoryRepository),
+  updateSkillCategory: new UpdateSkillCategory(skillCategoryRepository),
+  deleteSkillCategory: new DeleteSkillCategory(skillCategoryRepository),
+  reorderSkillCategories: new ReorderSkillCategories(skillCategoryRepository),
+  // Projects
+  listProjects: new ListProjects(projectRepository),
+  getProject: new GetProject(projectRepository),
+  createProject: new CreateProject(projectRepository, mediaRepository),
+  updateProject: new UpdateProject(projectRepository, mediaRepository),
+  deleteProject: new DeleteProject(projectRepository),
+  reorderProjects: new ReorderProjects(projectRepository),
   // Skills
   listSkills: new ListSkills(skillRepository),
   getSkill: new GetSkill(skillRepository),
