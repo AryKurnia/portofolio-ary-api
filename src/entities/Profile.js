@@ -1,14 +1,23 @@
 const Entity = require('./Entity');
 
+// Profil pemilik portofolio (singleton). Foto (photoMediaId) dikelola lewat upload di M4.
 class Profile extends Entity {
-  constructor({ name, email, tagline, about, photoUrl, socialMedia, ...attrs } = {}) {
+  constructor({
+    greeting,
+    tagline,
+    about,
+    projectIntro = null,
+    email,
+    photoMediaId = null,
+    ...attrs
+  } = {}) {
     super(attrs);
-    this.name = name;
-    this.email = email;
+    this.greeting = greeting;
     this.tagline = tagline;
     this.about = about;
-    this.photoUrl = photoUrl;
-    this.socialMedia = socialMedia;
+    this.projectIntro = projectIntro;
+    this.email = email;
+    this.photoMediaId = photoMediaId;
   }
 }
 
