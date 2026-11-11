@@ -5,7 +5,7 @@ const sequelize = require('./db/sequelizeClient');
 // Repositories and Storage
 // Repositories
 const MariaDBUserRepository = require('../repositories/mariadb/MariaDBUserRepository');
-const MariaDBSocialMediaRepository = require('../repositories/mariadb/MariaDBSocialMediaRepository');
+const MariaDBSocialLinkRepository = require('../repositories/mariadb/MariaDBSocialLinkRepository');
 const MariaDBSkillRepository = require('../repositories/mariadb/MariaDBSkillRepository');
 const MariaDBRefreshTokenRepository = require('../repositories/mariadb/MariaDBRefreshTokenRepository');
 const MariaDBProfileRepository = require('../repositories/mariadb/MariaDBProfileRepository');
@@ -78,23 +78,26 @@ const UploadMedia = require('../use-cases/media/UploadMedia');
 const DeleteMedia = require('../use-cases/media/DeleteMedia');
 const CleanupOrphanMedia = require('../use-cases/media/CleanupOrphanMedia');
 
-// Media Social
-const ListSocialMedia = require('../use-cases/social-media/ListSocialMedia');
-const GetSocialMediaByPlatform = require('../use-cases/social-media/GetSocialMediaByPlatform');
-const UpdateSocialMedia = require('../use-cases/social-media/UpdateSocialMedia');
-
 // Skills
 const ListSkills = require('../use-cases/skill/ListSkills');
 const GetSkill = require('../use-cases/skill/GetSkill');
 const CreateSkill = require('../use-cases/skill/CreateSkill');
 const UpdateSkill = require('../use-cases/skill/UpdateSkill');
 const DeleteSkill = require('../use-cases/skill/DeleteSkill');
-const UploadSkillLogo = require('../use-cases/skill/UploadSkillLogo');
+const ReorderSkills = require('../use-cases/skill/ReorderSkills');
+const ListPublishedSkills = require('../use-cases/public/ListPublishedSkills');
+
+// Social links
+const ListSocialLinks = require('../use-cases/social-link/ListSocialLinks');
+const CreateSocialLink = require('../use-cases/social-link/CreateSocialLink');
+const UpdateSocialLink = require('../use-cases/social-link/UpdateSocialLink');
+const DeleteSocialLink = require('../use-cases/social-link/DeleteSocialLink');
+const ReorderSocialLinks = require('../use-cases/social-link/ReorderSocialLinks');
 // End Use-cases
 
 const skillRepository = new MariaDBSkillRepository();
 const userRepository = new MariaDBUserRepository();
-const socialMediaRepository = new MariaDBSocialMediaRepository();
+const socialLinkRepository = new MariaDBSocialLinkRepository();
 const refreshTokenRepository = new MariaDBRefreshTokenRepository();
 const profileRepository = new MariaDBProfileRepository();
 const organizationRepository = new MariaDBOrganizationRepository();
@@ -116,16 +119,20 @@ const fileStorage = new MinioFileStorage(minioClient, config.minio.bucket, confi
 const getProfile = new GetProfile(profileRepository);
 const listPublishedProjects = new ListPublishedProjects(projectRepository);
 const getTimeline = new GetTimeline(organizationRepository);
-const listPublicSocialLinks = new ListPublicSocialLinks(socialMediaRepository);
+const skillDeps = { skillRepository, skillCategoryRepository, mediaRepository };
+const listPublishedSkills = new ListPublishedSkills(skillDeps);
+const listPublicSocialLinks = new ListPublicSocialLinks(socialLinkRepository);
 
 module.exports = {
   // Public
+  listPublishedSkills,
   listPublishedProjects,
   getPublishedProject: new GetPublishedProject(projectRepository),
   getTimeline,
   listPublicSocialLinks,
   getPortfolio: new GetPortfolio({
     getProfile,
+    listPublishedSkills,
     listPublishedProjects,
     getTimeline,
     listPublicSocialLinks,
@@ -156,10 +163,10 @@ module.exports = {
   deletePosition: new DeletePosition(positionRepository),
   reorderPositions: new ReorderPositions(organizationRepository, positionRepository),
   // Skill categories
-  listSkillCategories: new ListSkillCategories(skillCategoryRepository),
+  listSkillCategories: new ListSkillCategories(skillCategoryRepository, skillRepository),
   createSkillCategory: new CreateSkillCategory(skillCategoryRepository),
   updateSkillCategory: new UpdateSkillCategory(skillCategoryRepository),
-  deleteSkillCategory: new DeleteSkillCategory(skillCategoryRepository),
+  deleteSkillCategory: new DeleteSkillCategory(skillCategoryRepository, skillRepository),
   reorderSkillCategories: new ReorderSkillCategories(skillCategoryRepository),
   // Projects
   listProjects: new ListProjects(projectRepository),
@@ -169,14 +176,16 @@ module.exports = {
   deleteProject: new DeleteProject(projectRepository),
   reorderProjects: new ReorderProjects(projectRepository),
   // Skills
-  listSkills: new ListSkills(skillRepository),
-  getSkill: new GetSkill(skillRepository),
-  createSkill: new CreateSkill(skillRepository),
-  updateSkill: new UpdateSkill(skillRepository),
-  deleteSkill: new DeleteSkill(skillRepository, fileStorage, logger),
-  uploadSkillLogo: new UploadSkillLogo(skillRepository, fileStorage),
-  // Social Media
-  listSocialMedia: new ListSocialMedia(socialMediaRepository),
-  getSocialMediaByPlatform: new GetSocialMediaByPlatform(socialMediaRepository),
-  updateSocialMedia: new UpdateSocialMedia(socialMediaRepository),
+  listSkills: new ListSkills(skillDeps),
+  getSkill: new GetSkill(skillDeps),
+  createSkill: new CreateSkill(skillDeps),
+  updateSkill: new UpdateSkill(skillDeps),
+  deleteSkill: new DeleteSkill(skillDeps),
+  reorderSkills: new ReorderSkills(skillDeps),
+  // Social links
+  listSocialLinks: new ListSocialLinks({ socialLinkRepository }),
+  createSocialLink: new CreateSocialLink({ socialLinkRepository }),
+  updateSocialLink: new UpdateSocialLink({ socialLinkRepository }),
+  deleteSocialLink: new DeleteSocialLink({ socialLinkRepository }),
+  reorderSocialLinks: new ReorderSocialLinks({ socialLinkRepository }),
 };

@@ -1,25 +1,31 @@
 const Skill = require('../../entities/Skill');
 const NotFoundError = require('../../exceptions/NotFoundError');
+const pickDefined = require('../pickDefined');
+const validateSkill = require('./validateSkill');
+const nextSortOrder = require('./nextSortOrder');
 
 class UpdateSkill {
-  constructor(skillRepository) {
-    this._skillRepository = skillRepository;
+  constructor(deps) {
+    this._deps = deps;
   }
 
-  async execute(id, { name, description, enabled }) {
-    const existingSkill = await this._skillRepository.findById(id);
-    if (!existingSkill) {
+  // Aturan divalidasi terhadap gabungan data lama + perubahan. Pindah kategori → urutan terakhir.
+  async execute(id, { categoryId, name, logoMediaId, isPublished }) {
+    const { skillRepository } = this._deps;
+    const existing = await skillRepository.findById(id);
+    if (!existing) {
       throw new NotFoundError(`Skill with id ${id} was not found.`);
     }
 
-    const updatedSkill = new Skill({
-      ...existingSkill,
-      name,
-      description,
-      enabled,
+    const updated = new Skill({
+      ...existing,
+      ...pickDefined({ categoryId, name, logoMediaId, isPublished }),
     });
-
-    return this._skillRepository.update(id, updatedSkill);
+    await validateSkill(updated, this._deps, id);
+    if (updated.categoryId !== existing.categoryId) {
+      updated.sortOrder = await nextSortOrder(skillRepository, updated.categoryId);
+    }
+    return skillRepository.update(id, updated);
   }
 }
 

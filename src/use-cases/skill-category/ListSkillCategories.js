@@ -1,10 +1,16 @@
+// Setiap kategori dilengkapi skillCount (ditampilkan di admin; DELETE ditolak bila > 0).
 class ListSkillCategories {
-  constructor(skillCategoryRepository) {
+  constructor(skillCategoryRepository, skillRepository) {
     this._skillCategoryRepository = skillCategoryRepository;
+    this._skillRepository = skillRepository;
   }
 
   async execute() {
-    return this._skillCategoryRepository.findAll();
+    const [categories, counts] = await Promise.all([
+      this._skillCategoryRepository.findAll(),
+      this._skillRepository.countByCategory(),
+    ]);
+    return categories.map((category) => ({ ...category, skillCount: counts[category.id] ?? 0 }));
   }
 }
 

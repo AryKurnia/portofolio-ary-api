@@ -1,10 +1,13 @@
-// Bentuk JSON publik untuk Skill (snake_case, field eksplisit — atribut entity lain tidak ikut bocor).
+const { toImageResponse } = require('../shared/media');
+
 const toSkillResponse = (skill) => ({
   id: skill.id,
+  category_id: skill.categoryId,
   name: skill.name,
-  logo_url: skill.logoUrl ?? null,
-  description: skill.description ?? null,
-  enabled: skill.enabled,
+  logo_id: skill.logoMediaId,
+  logo: toImageResponse(skill.logo),
+  is_published: skill.isPublished,
+  sort_order: skill.sortOrder,
   created_at: skill.createdAt,
   updated_at: skill.updatedAt,
 });

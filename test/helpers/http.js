@@ -42,10 +42,13 @@ const USE_CASES = [
   'createSkill',
   'updateSkill',
   'deleteSkill',
-  'uploadSkillLogo',
-  'listSocialMedia',
-  'getSocialMediaByPlatform',
-  'updateSocialMedia',
+  'reorderSkills',
+  'listPublishedSkills',
+  'listSocialLinks',
+  'createSocialLink',
+  'updateSocialLink',
+  'deleteSocialLink',
+  'reorderSocialLinks',
 ];
 
 // Dipakai di dalam factory jest.mock('.../infrastructure/container', ...).

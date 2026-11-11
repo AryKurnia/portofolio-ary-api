@@ -2,6 +2,7 @@ const ListPublishedProjects = require('./ListPublishedProjects');
 const GetPublishedProject = require('./GetPublishedProject');
 const GetTimeline = require('./GetTimeline');
 const ListPublicSocialLinks = require('./ListPublicSocialLinks');
+const ListPublishedSkills = require('./ListPublishedSkills');
 const GetPortfolio = require('./GetPortfolio');
 const Organization = require('../../entities/Organization');
 const Position = require('../../entities/Position');
@@ -100,15 +101,10 @@ describe('GetTimeline use-case', () => {
 });
 
 describe('ListPublicSocialLinks use-case', () => {
-  it('hanya mengembalikan social media yang aktif', async () => {
-    const repo = {
-      findAll: jest.fn().mockResolvedValue([
-        { platform: 'github', enabled: true },
-        { platform: 'twitter', enabled: false },
-      ]),
-    };
-    const result = await new ListPublicSocialLinks(repo).execute();
-    expect(result.map((item) => item.platform)).toEqual(['github']);
+  it('hanya meminta link yang terbit', async () => {
+    const repo = { findAll: jest.fn().mockResolvedValue([]) };
+    await new ListPublicSocialLinks(repo).execute();
+    expect(repo.findAll).toHaveBeenCalledWith({ publishedOnly: true });
   });
 
   it('meneruskan error kalau findAll gagal', async () => {
@@ -117,9 +113,41 @@ describe('ListPublicSocialLinks use-case', () => {
   });
 });
 
+describe('ListPublishedSkills use-case', () => {
+  it('mengelompokkan skill terbit per kategori (urutan kategori) dan membuang kategori kosong', async () => {
+    const deps = {
+      skillCategoryRepository: {
+        findAll: jest.fn().mockResolvedValue([
+          { id: 1, name: 'Frontend' },
+          { id: 2, name: 'Backend' },
+          { id: 3, name: 'Tools' },
+        ]),
+      },
+      skillRepository: {
+        findAll: jest.fn().mockResolvedValue([
+          { id: 10, categoryId: 2, name: 'Node.js' },
+          { id: 11, categoryId: 1, name: 'HTML5' },
+          { id: 12, categoryId: 2, name: 'hapi' },
+        ]),
+      },
+    };
+
+    const result = await new ListPublishedSkills(deps).execute();
+
+    expect(deps.skillRepository.findAll).toHaveBeenCalledWith({ publishedOnly: true });
+    expect(result.map((group) => [group.category.name, group.items.map((s) => s.name)])).toEqual([
+      ['Frontend', ['HTML5']],
+      ['Backend', ['Node.js', 'hapi']],
+    ]);
+  });
+});
+
 describe('GetPortfolio use-case', () => {
   const createDeps = ({ total = 6, items = 6 } = {}) => ({
     getProfile: { execute: jest.fn().mockResolvedValue({ greeting: 'Hi' }) },
+    listPublishedSkills: {
+      execute: jest.fn().mockResolvedValue([{ category: { id: 1 }, items: [] }]),
+    },
     listPublishedProjects: {
       execute: jest.fn().mockResolvedValue({
         data: Array.from({ length: items }, (_, i) => ({ id: i + 1 })),
@@ -136,6 +164,7 @@ describe('GetPortfolio use-case', () => {
     expect(deps.listPublishedProjects.execute).toHaveBeenCalledWith({ page: 1, limit: 6 });
     expect(result).toEqual({
       profile: { greeting: 'Hi' },
+      skills: [{ category: { id: 1 }, items: [] }],
       projects: { items: expect.any(Array), total: 6, hasMore: false },
       timeline: { education: [], work_organization: [] },
       socialLinks: [{ platform: 'github' }],
@@ -147,12 +176,15 @@ describe('GetPortfolio use-case', () => {
     expect(result.projects.hasMore).toBe(true);
   });
 
-  it.each(['getProfile', 'listPublishedProjects', 'getTimeline', 'listPublicSocialLinks'])(
-    'meneruskan error kalau %s gagal',
-    async (dependency) => {
-      const deps = createDeps();
-      deps[dependency].execute.mockRejectedValue(new Error(`${dependency} gagal`));
-      await expect(new GetPortfolio(deps).execute()).rejects.toThrow(`${dependency} gagal`);
-    }
-  );
+  it.each([
+    'getProfile',
+    'listPublishedSkills',
+    'listPublishedProjects',
+    'getTimeline',
+    'listPublicSocialLinks',
+  ])('meneruskan error kalau %s gagal', async (dependency) => {
+    const deps = createDeps();
+    deps[dependency].execute.mockRejectedValue(new Error(`${dependency} gagal`));
+    await expect(new GetPortfolio(deps).execute()).rejects.toThrow(`${dependency} gagal`);
+  });
 });

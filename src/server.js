@@ -85,7 +85,7 @@ const createServer = async () => {
       require('./interfaces/http/health/index'),
       require('./interfaces/http/auth/index'),
       require('./interfaces/http/skills/index'),
-      require('./interfaces/http/social-media/index'),
+      require('./interfaces/http/social-links/index'),
       require('./interfaces/http/profile/index'),
       require('./interfaces/http/timeline/index'),
       require('./interfaces/http/skill-categories/index'),

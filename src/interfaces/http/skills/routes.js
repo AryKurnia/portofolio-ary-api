@@ -1,67 +1,49 @@
-// src/interfaces/http/skills/routes.js
 const handler = require('./handler');
 const {
   idParamSchema,
-  listQuerySchema,
+  listSkillsQuerySchema,
   createSkillPayloadSchema,
   updateSkillPayloadSchema,
-  uploadLogoPayloadSchema,
+  reorderSkillsPayloadSchema,
 } = require('./validator');
+
+const admin = (validate = {}) => ({ auth: 'jwt', validate });
 
 module.exports = [
   {
     method: 'GET',
-    path: '/skills',
-    options: { validate: { query: listQuerySchema } },
+    path: '/admin/skills',
+    options: admin({ query: listSkillsQuerySchema }),
     handler: handler.list,
   },
   {
-    method: 'GET',
-    path: '/skills/{id}',
-    options: { validate: { params: idParamSchema } },
-    handler: handler.detail,
-  },
-  {
     method: 'POST',
-    path: '/skills',
-    options: {
-      auth: 'jwt',
-      validate: { payload: createSkillPayloadSchema },
-    },
+    path: '/admin/skills',
+    options: admin({ payload: createSkillPayloadSchema }),
     handler: handler.create,
   },
   {
-    method: 'PUT',
-    path: '/skills/{id}',
-    options: {
-      auth: 'jwt',
-      validate: { params: idParamSchema, payload: updateSkillPayloadSchema },
-    },
+    method: 'PATCH',
+    path: '/admin/skills/reorder',
+    options: admin({ payload: reorderSkillsPayloadSchema }),
+    handler: handler.reorder,
+  },
+  {
+    method: 'GET',
+    path: '/admin/skills/{id}',
+    options: admin({ params: idParamSchema }),
+    handler: handler.detail,
+  },
+  {
+    method: 'PATCH',
+    path: '/admin/skills/{id}',
+    options: admin({ params: idParamSchema, payload: updateSkillPayloadSchema }),
     handler: handler.update,
   },
   {
     method: 'DELETE',
-    path: '/skills/{id}',
-    options: {
-      auth: 'jwt',
-      validate: { params: idParamSchema },
-    },
+    path: '/admin/skills/{id}',
+    options: admin({ params: idParamSchema }),
     handler: handler.remove,
-  },
-  {
-    method: 'POST',
-    path: '/skills/{id}/logo',
-    options: {
-      auth: 'jwt',
-      payload: {
-        output: 'stream',
-        parse: true,
-        multipart: true,
-        maxBytes: 2 * 1024 * 1024, // 2MB
-        allow: 'multipart/form-data',
-      },
-      validate: { params: idParamSchema, payload: uploadLogoPayloadSchema },
-    },
-    handler: handler.uploadLogo,
   },
 ];

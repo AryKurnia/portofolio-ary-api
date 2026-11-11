@@ -175,39 +175,69 @@ describe('HTTP routes publik /api/v1', () => {
     expect(organization.positions[0]).not.toHaveProperty('organization_id');
   });
 
-  it('social links memberi label default dari platform (twitter → X)', async () => {
+  it('social links memakai label kustom bila ada, selain itu label dari platform', async () => {
     container.listPublicSocialLinks.execute.mockResolvedValue([
-      { platform: 'github', url: 'https://github.com/x', username: 'x', enabled: true },
-      { platform: 'twitter', url: 'https://x.com/x', username: 'x', enabled: true },
+      {
+        id: 1,
+        platform: 'github',
+        label: null,
+        url: 'https://github.com/x',
+        isPublished: true,
+        sortOrder: 1,
+      },
+      {
+        id: 2,
+        platform: 'x',
+        label: null,
+        url: 'https://x.com/x',
+        isPublished: true,
+        sortOrder: 2,
+      },
+      {
+        id: 3,
+        platform: 'other',
+        label: 'Blog',
+        url: 'https://blog.example',
+        isPublished: true,
+        sortOrder: 3,
+      },
     ]);
     const response = await get('/social-links');
     expect(response.result.data).toEqual([
       { platform: 'github', label: 'GitHub', url: 'https://github.com/x' },
-      { platform: 'twitter', label: 'X', url: 'https://x.com/x' },
+      { platform: 'x', label: 'X', url: 'https://x.com/x' },
+      { platform: 'other', label: 'Blog', url: 'https://blog.example' },
     ]);
   });
 
-  it('platform dinormalkan ke huruf kecil (data lama "linkedIn")', async () => {
-    container.listPublicSocialLinks.execute.mockResolvedValue([
-      { platform: 'linkedIn', url: 'https://linkedin.com/in/x', enabled: true },
+  it('skills dikelompokkan per kategori tanpa field admin', async () => {
+    container.listPublishedSkills.execute.mockResolvedValue([
+      {
+        category: { id: 2, name: 'Backend', sortOrder: 2 },
+        items: [
+          { id: 10, categoryId: 2, name: 'Node.js', logo: null, isPublished: true, sortOrder: 1 },
+        ],
+      },
     ]);
-    const response = await get('/social-links');
+    const response = await get('/skills');
     expect(response.result.data).toEqual([
-      { platform: 'linkedin', label: 'LinkedIn', url: 'https://linkedin.com/in/x' },
+      { category: { id: 2, name: 'Backend' }, items: [{ id: 10, name: 'Node.js', logo: null }] },
     ]);
   });
 
   it('portfolio menggabungkan semua section dalam snake_case', async () => {
     container.getPortfolio.execute.mockResolvedValue({
       profile,
+      skills: [],
       projects: { items: [project], total: 7, hasMore: true },
       timeline,
-      socialLinks: [{ platform: 'github', url: 'https://github.com/x' }],
+      socialLinks: [{ platform: 'github', label: null, url: 'https://github.com/x' }],
     });
     const response = await get('/portfolio');
     expect(Object.keys(response.result.data).sort()).toEqual([
       'profile',
       'projects',
+      'skills',
       'social_links',
       'timeline',
     ]);

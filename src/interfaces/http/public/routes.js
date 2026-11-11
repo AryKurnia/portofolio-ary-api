@@ -18,6 +18,7 @@ module.exports = [
     options: { validate: { params: idParamSchema } },
     handler: handler.project,
   },
+  { method: 'GET', path: '/skills', handler: handler.skills },
   { method: 'GET', path: '/timeline', handler: handler.timeline },
   { method: 'GET', path: '/social-links', handler: handler.socialLinks },
 ];

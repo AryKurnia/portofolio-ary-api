@@ -1,36 +1,35 @@
 const Joi = require('joi');
+const { plainText, idParamSchema } = require('../shared/validation');
 
-const idParamSchema = Joi.object({
-  id: Joi.number().integer().positive().required(),
-});
+const id = () => Joi.number().integer().positive();
 
-const listQuerySchema = Joi.object({
-  page: Joi.number().integer().min(1).default(1),
-  limit: Joi.number().integer().min(1).max(100).default(10),
-});
+const listSkillsQuerySchema = Joi.object({ category_id: id() });
+
+const fields = {
+  category_id: id(),
+  name: plainText(40),
+  logo_id: id().allow(null),
+  is_published: Joi.boolean(),
+};
 
 const createSkillPayloadSchema = Joi.object({
-  name: Joi.string().max(100).required(),
-  description: Joi.string().allow('', null),
-  enabled: Joi.boolean().default(true),
+  ...fields,
+  category_id: fields.category_id.required(),
+  name: fields.name.required(),
 });
 
-const updateSkillPayloadSchema = Joi.object({
-  name: Joi.string().max(100).required(),
-  description: Joi.string().allow('', null).required(),
-  enabled: Joi.boolean().required(),
-});
+const updateSkillPayloadSchema = Joi.object(fields).min(1);
 
-// Payload multipart berupa stream: cukup pastikan field `logo` ada.
-// Joi.any() dipakai agar stream tidak di-clone/diubah oleh Joi.
-const uploadLogoPayloadSchema = Joi.object({
-  logo: Joi.any().required(),
-}).unknown(true);
+// Urutan berlaku di dalam satu kategori.
+const reorderSkillsPayloadSchema = Joi.object({
+  category_id: id().required(),
+  ids: Joi.array().items(id()).min(1).unique().required(),
+});
 
 module.exports = {
   idParamSchema,
-  listQuerySchema,
+  listSkillsQuerySchema,
   createSkillPayloadSchema,
   updateSkillPayloadSchema,
-  uploadLogoPayloadSchema,
+  reorderSkillsPayloadSchema,
 };

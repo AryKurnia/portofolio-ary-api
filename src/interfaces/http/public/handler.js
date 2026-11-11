@@ -23,6 +23,11 @@ module.exports = {
     return cachedResponse(h, { data: presenter.toPublicProject(project) });
   },
 
+  async skills(request, h) {
+    const groups = await container.listPublishedSkills.execute();
+    return cachedResponse(h, { data: presenter.toPublicSkillGroups(groups) });
+  },
+
   async timeline(request, h) {
     const timeline = await container.getTimeline.execute();
     return cachedResponse(h, { data: presenter.toPublicTimeline(timeline) });

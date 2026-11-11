@@ -12,6 +12,8 @@ const categories = [
   { id: 2, name: 'Backend', sortOrder: 2 },
 ];
 
+const skillRepo = (counts = {}) => ({ countByCategory: jest.fn().mockResolvedValue(counts) });
+
 const createRepo = (overrides = {}) => ({
   findAll: jest.fn().mockResolvedValue(categories),
   findById: jest.fn().mockResolvedValue(categories[0]),
@@ -25,12 +27,17 @@ const createRepo = (overrides = {}) => ({
 
 describe('ListSkillCategories use-case', () => {
   it('mengembalikan semua kategori', async () => {
-    await expect(new ListSkillCategories(createRepo()).execute()).resolves.toEqual(categories);
+    await expect(
+      new ListSkillCategories(createRepo(), skillRepo({ 1: 3 })).execute()
+    ).resolves.toEqual([
+      { ...categories[0], skillCount: 3 },
+      { ...categories[1], skillCount: 0 },
+    ]);
   });
 
   it('meneruskan error kalau findAll gagal', async () => {
     const repo = createRepo({ findAll: jest.fn().mockRejectedValue(new Error('DB error')) });
-    await expect(new ListSkillCategories(repo).execute()).rejects.toThrow('DB error');
+    await expect(new ListSkillCategories(repo, skillRepo()).execute()).rejects.toThrow('DB error');
   });
 });
 
@@ -115,19 +122,31 @@ describe('UpdateSkillCategory use-case', () => {
 describe('DeleteSkillCategory use-case', () => {
   it('menghapus kategori yang ada', async () => {
     const repo = createRepo();
-    await new DeleteSkillCategory(repo).execute(1);
+    await new DeleteSkillCategory(repo, skillRepo()).execute(1);
     expect(repo.delete).toHaveBeenCalledWith(1);
   });
 
   it('melempar NotFoundError dan tidak menghapus kalau kategori tidak ada', async () => {
     const repo = createRepo({ findById: jest.fn().mockResolvedValue(null) });
-    await expect(new DeleteSkillCategory(repo).execute(9)).rejects.toThrow(NotFoundError);
+    await expect(new DeleteSkillCategory(repo, skillRepo()).execute(9)).rejects.toThrow(
+      NotFoundError
+    );
     expect(repo.delete).not.toHaveBeenCalled();
   });
 
   it('meneruskan error kalau delete gagal', async () => {
     const repo = createRepo({ delete: jest.fn().mockRejectedValue(new Error('DB error')) });
-    await expect(new DeleteSkillCategory(repo).execute(1)).rejects.toThrow('DB error');
+    await expect(new DeleteSkillCategory(repo, skillRepo()).execute(1)).rejects.toThrow('DB error');
+  });
+});
+
+describe('DeleteSkillCategory — masih berisi skill', () => {
+  it('melempar ConflictError dan tidak menghapus bila kategori masih berisi skill', async () => {
+    const repo = createRepo();
+    await expect(new DeleteSkillCategory(repo, skillRepo({ 1: 2 })).execute(1)).rejects.toThrow(
+      ConflictError
+    );
+    expect(repo.delete).not.toHaveBeenCalled();
   });
 });
 

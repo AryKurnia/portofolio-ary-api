@@ -19,12 +19,14 @@ describe('HTTP routes /api/v1/admin/skill-categories', () => {
     jest.resetAllMocks();
   });
 
-  it('GET mengembalikan kategori dengan sort_order', async () => {
+  it('GET mengembalikan kategori dengan sort_order dan skill_count', async () => {
     container.listSkillCategories.execute.mockResolvedValue([
-      { id: 1, name: 'Frontend', sortOrder: 1 },
+      { id: 1, name: 'Frontend', sortOrder: 1, skillCount: 3 },
     ]);
     const response = await inject('GET', '/skill-categories');
-    expect(response.result).toEqual({ data: [{ id: 1, name: 'Frontend', sort_order: 1 }] });
+    expect(response.result).toEqual({
+      data: [{ id: 1, name: 'Frontend', sort_order: 1, skill_count: 3 }],
+    });
   });
 
   it('POST menolak nama kosong, terlalu panjang, atau berisi HTML', async () => {

@@ -1,7 +1,7 @@
 const NotFoundError = require('../../exceptions/NotFoundError');
 
 class GetSkill {
-  constructor(skillRepository) {
+  constructor({ skillRepository }) {
     this._skillRepository = skillRepository;
   }
 

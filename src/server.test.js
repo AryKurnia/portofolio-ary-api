@@ -29,19 +29,19 @@ describe('createServer — perilaku lintas route', () => {
 
   it('path lama tanpa prefix /api/v1 tidak lagi tersedia', async () => {
     // ACT
-    const response = await server.inject({ method: 'GET', url: '/skills' });
+    const response = await server.inject({ method: 'GET', url: '/profile' });
 
     // ASSERT
     expect(response.statusCode).toBe(404);
-    expect(container.listSkills.execute).not.toHaveBeenCalled();
+    expect(container.getProfile.execute).not.toHaveBeenCalled();
   });
 
   it('error tak terduga dibalas 500 INTERNAL_ERROR tanpa membocorkan pesan aslinya', async () => {
     // ARRANGE
-    container.getSkill.execute.mockRejectedValue(new Error('ER_ACCESS_DENIED db-user@10.0.0.5'));
+    container.getProfile.execute.mockRejectedValue(new Error('ER_ACCESS_DENIED db-user@10.0.0.5'));
 
     // ACT
-    const response = await server.inject({ method: 'GET', url: '/api/v1/skills/1' });
+    const response = await server.inject({ method: 'GET', url: '/api/v1/profile' });
 
     // ASSERT
     expect(response.statusCode).toBe(500);

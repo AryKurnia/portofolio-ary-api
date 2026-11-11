@@ -1,16 +1,7 @@
 // Bentuk respons PUBLIK: hanya field yang dibutuhkan halaman portofolio (tanpa data admin).
 const { periodLabel, TYPE_LABELS } = require('../timeline/presenter');
 const { toImageResponse } = require('../shared/media');
-
-const SOCIAL_LABELS = {
-  github: 'GitHub',
-  linkedin: 'LinkedIn',
-  instagram: 'Instagram',
-  facebook: 'Facebook',
-  discord: 'Discord',
-  twitter: 'X',
-  x: 'X',
-};
+const { displayLabel } = require('../social-links/presenter');
 
 const toPublicProfile = (profile) => ({
   greeting: profile.greeting,
@@ -59,14 +50,25 @@ const toPublicTimeline = (timeline) =>
     ])
   );
 
-// platform dinormalkan ke huruf kecil: data lama menyimpan 'linkedIn' (dibereskan di migrasi social_links).
-const toPublicSocialLink = (link) => {
-  const platform = link.platform.toLowerCase();
-  return { platform, label: link.label ?? SOCIAL_LABELS[platform] ?? 'Link', url: link.url };
-};
+const toPublicSocialLink = (link) => ({
+  platform: link.platform,
+  label: displayLabel(link),
+  url: link.url,
+});
 
-const toPublicPortfolio = ({ profile, projects, timeline, socialLinks }) => ({
+const toPublicSkillGroups = (groups) =>
+  groups.map(({ category, items }) => ({
+    category: { id: category.id, name: category.name },
+    items: items.map((skill) => ({
+      id: skill.id,
+      name: skill.name,
+      logo: toImageResponse(skill.logo),
+    })),
+  }));
+
+const toPublicPortfolio = ({ profile, skills, projects, timeline, socialLinks }) => ({
   profile: toPublicProfile(profile),
+  skills: toPublicSkillGroups(skills),
   projects: {
     items: projects.items.map(toPublicProject),
     total: projects.total,
@@ -81,5 +83,6 @@ module.exports = {
   toPublicProject,
   toPublicTimeline,
   toPublicSocialLink,
+  toPublicSkillGroups,
   toPublicPortfolio,
 };
