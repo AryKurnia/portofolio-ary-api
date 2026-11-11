@@ -34,7 +34,7 @@ tags:
   - name: Health
   - name: Auth
   - name: Skills
-  - name: Social Media
+  - name: Social Links
   - name: Profile
   - name: Timeline
   - name: Skill Categories
@@ -53,7 +53,7 @@ paths:
       summary: Semua data halaman utama dalam satu request (untuk SSR/ISR)
       description: |
         `projects.items` berisi maksimal 6 project terbit; `has_more` memunculkan tombol
-        "See all projects". Skill per kategori ditambahkan setelah skill dikaitkan ke kategori.
+        "See all projects".
       responses:
         '200':
           description: Data portofolio
@@ -68,10 +68,13 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [profile, projects, timeline, social_links]
+                    required: [profile, skills, projects, timeline, social_links]
                     additionalProperties: false
                     properties:
                       profile: { $ref: '#/components/schemas/PublicProfile' }
+                      skills:
+                        type: array
+                        items: { $ref: '#/components/schemas/PublicSkillGroup' }
                       projects:
                         type: object
                         required: [items, total, has_more]
@@ -162,6 +165,27 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /skills:
+    get:
+      tags: [Public]
+      summary: Skill terbit dikelompokkan per kategori
+      description: Urut kategori → skill. Kategori tanpa skill terbit tidak ditampilkan.
+      responses:
+        '200':
+          description: Skill per kategori
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PublicSkillGroup' }
 
   /timeline:
     get:
@@ -349,154 +373,22 @@ paths:
           $ref: '#/components/responses/Unauthorized'
 
   # ============================================================
-  # SKILLS
+  # SKILLS (admin)
   # ============================================================
-  /skills:
+  /admin/skills:
     get:
       tags: [Skills]
-      summary: List skill (berpaginasi)
-      description: Saat ini mengembalikan semua skill, termasuk `enabled = false`.
+      summary: Daftar skill (termasuk yang belum terbit)
+      description: Urut kategori (sort_order) → skill (sort_order).
+      security:
+        - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/LimitParam'
+        - name: category_id
+          in: query
+          schema: { type: integer, minimum: 1 }
       responses:
         '200':
           description: Daftar skill
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data, meta]
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Skill'
-                  meta:
-                    $ref: '#/components/schemas/PaginationMeta'
-        '400':
-          $ref: '#/components/responses/ValidationError'
-    post:
-      tags: [Skills]
-      summary: Tambah skill
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SkillCreateInput'
-      responses:
-        '201':
-          $ref: '#/components/responses/SkillOk'
-        '400':
-          $ref: '#/components/responses/ValidationError'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  /skills/{id}:
-    parameters:
-      - $ref: '#/components/parameters/IdParam'
-    get:
-      tags: [Skills]
-      summary: Detail skill
-      responses:
-        '200':
-          $ref: '#/components/responses/SkillOk'
-        '400':
-          $ref: '#/components/responses/ValidationError'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    put:
-      tags: [Skills]
-      summary: Ganti data skill
-      description: Semua field wajib dikirim. `logo_url` tidak bisa diubah lewat endpoint ini.
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SkillUpdateInput'
-      responses:
-        '200':
-          $ref: '#/components/responses/SkillOk'
-        '400':
-          $ref: '#/components/responses/ValidationError'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    delete:
-      tags: [Skills]
-      summary: Hapus skill
-      description: Data dihapus lebih dulu; logo di storage dihapus setelahnya secara best-effort.
-      security:
-        - bearerAuth: []
-      responses:
-        '204':
-          description: Skill berhasil dihapus
-        '400':
-          $ref: '#/components/responses/ValidationError'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /skills/{id}/logo:
-    parameters:
-      - $ref: '#/components/parameters/IdParam'
-    post:
-      tags: [Skills]
-      summary: Upload/ganti logo skill
-      description: |
-        File disimpan ke object storage (MinIO) dan `logo_url` diperbarui.
-        Tipe file saat ini diperiksa dari header `Content-Type` bagian multipart
-        (pemeriksaan isi file direncanakan di M4).
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [logo]
-              properties:
-                logo:
-                  type: string
-                  format: binary
-                  description: PNG, JPEG, WebP, atau SVG — maksimal 2 MB
-            encoding:
-              logo:
-                contentType: image/png, image/jpeg, image/webp, image/svg+xml
-      responses:
-        '200':
-          $ref: '#/components/responses/SkillOk'
-        '400':
-          $ref: '#/components/responses/ValidationError'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '413':
-          $ref: '#/components/responses/PayloadTooLarge'
-        '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
-
-  # ============================================================
-  # SOCIAL MEDIA
-  # ============================================================
-  /profile/social-media:
-    get:
-      tags: [Social Media]
-      summary: List semua social media
-      description: Saat ini mengembalikan semua platform, termasuk `enabled = false`.
-      responses:
-        '200':
-          description: Daftar social media
           content:
             application/json:
               schema:
@@ -505,28 +397,37 @@ paths:
                 properties:
                   data:
                     type: array
-                    items:
-                      $ref: '#/components/schemas/SocialMedia'
-
-  /profile/social-media/{platform}:
-    parameters:
-      - $ref: '#/components/parameters/PlatformParam'
-    get:
-      tags: [Social Media]
-      summary: Detail social media per platform
-      responses:
-        '200':
-          $ref: '#/components/responses/SocialMediaOk'
+                    items: { $ref: '#/components/schemas/Skill' }
         '400':
           $ref: '#/components/responses/ValidationError'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    put:
-      tags: [Social Media]
-      summary: Update sebagian data social media
-      description: |
-        Hanya field yang dikirim yang diubah; field yang tidak dikirim mempertahankan nilai lama.
-        `platform` tidak bisa diubah.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Skills]
+      summary: Tambah skill (ditaruh paling akhir di kategorinya)
+      description: Skill terbit wajib punya `logo_id` hasil upload `kind=skill_logo`. Nama unik per kategori (409).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SkillCreateInput' }
+      responses:
+        '201':
+          $ref: '#/components/responses/SkillOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /admin/skills/reorder:
+    patch:
+      tags: [Skills]
+      summary: Simpan urutan skill di dalam satu kategori
+      description: '`ids` harus memuat semua skill kategori itu tepat satu kali.'
       security:
         - bearerAuth: []
       requestBody:
@@ -534,10 +435,171 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SocialMediaUpdateInput'
+              type: object
+              required: [category_id, ids]
+              additionalProperties: false
+              properties:
+                category_id: { type: integer, minimum: 1 }
+                ids:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items: { type: integer, minimum: 1 }
+      responses:
+        '204':
+          description: Urutan tersimpan
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/skills/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Skills]
+      summary: Detail skill
+      security:
+        - bearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/SocialMediaOk'
+          $ref: '#/components/responses/SkillOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Skills]
+      summary: Ubah sebagian skill
+      description: Pindah kategori menaruh skill di urutan terakhir kategori baru.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SkillUpdateInput' }
+      responses:
+        '200':
+          $ref: '#/components/responses/SkillOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [Skills]
+      summary: Hapus skill
+      description: Logo yang tidak lagi dipakai dibersihkan oleh `npm run media:cleanup`.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Skill terhapus
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # SOCIAL LINKS (admin)
+  # ============================================================
+  /admin/social-links:
+    get:
+      tags: [Social Links]
+      summary: Daftar tautan sosial (termasuk yang tidak terbit)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Daftar tautan
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/SocialLink' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Social Links]
+      summary: Tambah tautan (ditaruh paling akhir)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SocialLinkCreateInput' }
+      responses:
+        '201':
+          $ref: '#/components/responses/SocialLinkOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/social-links/reorder:
+    patch:
+      tags: [Social Links]
+      summary: Simpan urutan tautan hasil drag & drop
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReorderInput' }
+      responses:
+        '204':
+          description: Urutan tersimpan
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/social-links/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    patch:
+      tags: [Social Links]
+      summary: Ubah sebagian tautan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SocialLinkUpdateInput' }
+      responses:
+        '200':
+          $ref: '#/components/responses/SocialLinkOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Social Links]
+      summary: Hapus tautan
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Tautan terhapus
         '400':
           $ref: '#/components/responses/ValidationError'
         '401':
@@ -862,7 +924,7 @@ paths:
     delete:
       tags: [Skill Categories]
       summary: Hapus kategori
-      description: Penolakan 409 bila kategori masih berisi skill ditambahkan saat skill dikaitkan ke kategori.
+      description: Ditolak 409 bila kategori masih berisi skill.
       security:
         - bearerAuth: []
       responses:
@@ -874,6 +936,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   # ============================================================
   # PROJECTS (admin)
@@ -1121,15 +1185,6 @@ components:
         type: integer
         minimum: 1
       example: 1
-    PlatformParam:
-      name: platform
-      in: path
-      required: true
-      description: Nama platform sebagai kunci unik
-      schema:
-        type: string
-        enum: [github, linkedin, instagram, twitter, facebook]
-      example: github
     PageParam:
       name: page
       in: query
@@ -1137,16 +1192,25 @@ components:
         type: integer
         minimum: 1
         default: 1
-    LimitParam:
-      name: limit
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        maximum: 100
-        default: 10
-
   responses:
+    SkillOk:
+      description: Data skill
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/Skill' }
+    SocialLinkOk:
+      description: Data tautan sosial
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/SocialLink' }
     SkillCategoryOk:
       description: Data kategori skill
       content:
@@ -1209,26 +1273,6 @@ components:
               message: An organization with this name already exists in this group.
               details:
                 - { field: name, message: Name is already used in this group. }
-    SkillOk:
-      description: Data skill
-      content:
-        application/json:
-          schema:
-            type: object
-            required: [data]
-            properties:
-              data:
-                $ref: '#/components/schemas/Skill'
-    SocialMediaOk:
-      description: Data social media
-      content:
-        application/json:
-          schema:
-            type: object
-            required: [data]
-            properties:
-              data:
-                $ref: '#/components/schemas/SocialMedia'
     ValidationError:
       description: Input tidak valid (`VALIDATION_ERROR`); `details` berisi pesan per field
       content:
@@ -1518,12 +1562,15 @@ components:
 
     SkillCategory:
       type: object
-      required: [id, name, sort_order]
+      required: [id, name, sort_order, skill_count]
       additionalProperties: false
       properties:
         id: { type: integer }
         name: { type: string, maxLength: 40, example: Backend }
         sort_order: { type: integer }
+        skill_count:
+          type: integer
+          description: Jumlah skill; DELETE kategori ditolak 409 bila > 0
 
     SkillCategoryInput:
       type: object
@@ -1658,8 +1705,11 @@ components:
       required: [platform, label, url]
       additionalProperties: false
       properties:
-        platform: { type: string, example: github }
-        label: { type: string, example: GitHub }
+        platform: { $ref: '#/components/schemas/SocialPlatform' }
+        label:
+          type: string
+          description: Label kustom, atau nama platform bila kosong
+          example: GitHub
         url: { type: string, format: uri }
 
     Image:
@@ -1684,6 +1734,108 @@ components:
         - $ref: '#/components/schemas/Image'
         - type: 'null'
 
+    Skill:
+      type: object
+      required: [id, category_id, name, logo_id, logo, is_published, sort_order, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        category_id: { type: integer }
+        name: { type: string, maxLength: 40, example: Node.js }
+        logo_id: { type: [integer, 'null'] }
+        logo: { $ref: '#/components/schemas/NullableImage' }
+        is_published: { type: boolean }
+        sort_order: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    SkillFields:
+      type: object
+      properties:
+        category_id: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1, maxLength: 40 }
+        logo_id:
+          type: [integer, 'null']
+          minimum: 1
+          description: id hasil upload kind=skill_logo
+        is_published:
+          type: boolean
+          default: true
+          description: true mensyaratkan logo_id
+
+    SkillCreateInput:
+      allOf:
+        - $ref: '#/components/schemas/SkillFields'
+        - type: object
+          required: [category_id, name]
+
+    SkillUpdateInput:
+      allOf:
+        - $ref: '#/components/schemas/SkillFields'
+        - type: object
+          minProperties: 1
+
+    PublicSkillGroup:
+      type: object
+      required: [category, items]
+      additionalProperties: false
+      properties:
+        category:
+          type: object
+          required: [id, name]
+          additionalProperties: false
+          properties:
+            id: { type: integer }
+            name: { type: string, example: Backend }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id, name, logo]
+            additionalProperties: false
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              logo: { $ref: '#/components/schemas/NullableImage' }
+
+    SocialPlatform:
+      type: string
+      enum: [github, facebook, instagram, linkedin, discord, x, other]
+
+    SocialLink:
+      type: object
+      required: [id, platform, label, display_label, url, is_published, sort_order]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        platform: { $ref: '#/components/schemas/SocialPlatform' }
+        label: { type: [string, 'null'], description: Label kustom; null = pakai nama platform }
+        display_label: { type: string, example: GitHub }
+        url: { type: string, format: uri }
+        is_published: { type: boolean }
+        sort_order: { type: integer }
+
+    SocialLinkFields:
+      type: object
+      properties:
+        platform: { $ref: '#/components/schemas/SocialPlatform' }
+        label: { type: [string, 'null'], maxLength: 40 }
+        url: { type: string, format: uri, maxLength: 2048, description: Hanya https }
+        is_published: { type: boolean, default: true }
+
+    SocialLinkCreateInput:
+      allOf:
+        - $ref: '#/components/schemas/SocialLinkFields'
+        - type: object
+          required: [platform, url]
+
+    SocialLinkUpdateInput:
+      allOf:
+        - $ref: '#/components/schemas/SocialLinkFields'
+        - type: object
+          minProperties: 1
+
     PaginationMeta:
       type: object
       required: [page, limit, total]
@@ -1697,93 +1849,3 @@ components:
         total:
           type: integer
           example: 42
-
-    Skill:
-      type: object
-      required: [id, name, logo_url, description, enabled, created_at, updated_at]
-      additionalProperties: false
-      properties:
-        id:
-          type: integer
-          example: 1
-        name:
-          type: string
-          maxLength: 100
-          example: Node.js
-        logo_url:
-          type: [string, 'null']
-          example: https://minio.example.com/portfolio/skills/6f1c...png
-        description:
-          type: [string, 'null']
-          example: Runtime JavaScript di sisi server.
-        enabled:
-          type: boolean
-          example: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-
-    SkillCreateInput:
-      type: object
-      required: [name]
-      additionalProperties: false
-      properties:
-        name:
-          type: string
-          maxLength: 100
-        description:
-          type: [string, 'null']
-        enabled:
-          type: boolean
-          default: true
-
-    SkillUpdateInput:
-      type: object
-      required: [name, description, enabled]
-      additionalProperties: false
-      properties:
-        name:
-          type: string
-          maxLength: 100
-        description:
-          type: [string, 'null']
-        enabled:
-          type: boolean
-
-    SocialMedia:
-      type: object
-      required: [id, platform, url, username, enabled]
-      additionalProperties: false
-      properties:
-        id:
-          type: integer
-          example: 1
-        platform:
-          type: string
-          example: github
-        url:
-          type: string
-          format: uri
-          example: https://github.com/example
-        username:
-          type: string
-          example: example
-        enabled:
-          type: boolean
-          example: true
-
-    SocialMediaUpdateInput:
-      type: object
-      additionalProperties: false
-      properties:
-        url:
-          type: string
-          format: uri
-        username:
-          type: string
-          maxLength: 100
-        enabled:
-          type: boolean

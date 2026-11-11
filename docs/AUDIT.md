@@ -80,17 +80,21 @@ Perintah yang dijalankan (read-only): `npm ls`, `npm outdated`, `npm audit`,
 | **M5 (bagian 2)** admin skill categories: CRUD + reorder (409 nama duplikat) | ✅ — `skill_count` & 409 "masih berisi skill" menyusul di bagian 3 (butuh `skills.category_id`) |
 | **M5 (bagian 2)** admin projects: CRUD + reorder + paginasi; `show_button` ⇒ link https, terbit ⇒ `image_id` yang ada | ✅ — URL gambar & varian menyusul di M4; project baru bisa terbit setelah upload tersedia |
 | **M6** publik: `GET /portfolio`, `/profile`, `/projects`, `/projects/{id}`, `/timeline`, `/social-links` — hanya data terbit; `Cache-Control` publik + `ETag`/304 | ✅ — `skills` per kategori di `/portfolio` menyusul bagian 3; gambar project menyusul M4; social links sementara dari `social_media` (hanya yang aktif, platform dinormalkan huruf kecil) |
-| S7 data non-publik bocor di endpoint publik | ✅ untuk endpoint baru; endpoint lama `/skills` & `/profile/social-media` masih menampilkan yang nonaktif sampai diganti di bagian 3 |
+| S7 data non-publik bocor di endpoint publik | ✅ semua endpoint publik hanya menampilkan data terbit (endpoint lama dihapus di M5 bagian 3) |
 | **M4** `POST /admin/uploads?kind=` + `DELETE /admin/uploads/{id}`: tipe dari isi file (S3), WebP multi-ukuran, EXIF dibuang, batas 36 MP, SVG disanitasi hanya untuk logo (K7, S2), object key (C5), `Cache-Control: immutable`, rollback objek bila gagal | ✅ unit (sharp/DOMPurify sungguhan) + route + kontrak |
 | **M4** gambar di respons project & profile (`image`/`photo` + varian), `PATCH /admin/profile` `photo_id` (K13), validasi jenis media | ✅ |
 | **M4** `npm run media:cleanup` (media yatim > 24 jam) | ✅ — **jadwalkan via cron** saat deploy (M7) |
 | **M4** tes integrasi MinIO (`test/integration/media.flow.test.js`, prefix `it-test/`) | ✅ lulus terhadap MinIO lokal; bucket bersih setelah tes. **Menemukan bug `isReferenced`** (Sequelize membuang `NOT` pada `Op.not` + literal → media yang dipakai bisa terhapus) — diperbaiki + tes repository langsung |
 | S10 kebijakan bucket MinIO **lokal** | ✅ 11 Nov 2026: semula anonim boleh `PutObject`/`DeleteObject`/`ListBucket`; pemilik mengganti ke `s3:GetObject` saja. Terverifikasi: anonim PUT/DELETE/list → 403, GET gambar tetap 200, 43 tes integrasi lulus. ⏳ MinIO di server lain (bila ada) perlu dicek dengan cara sama |
-| Endpoint lama `POST /skills/{id}/logo` | ⏳ masih memakai cara lama (MIME dari header, tanpa sanitasi SVG) sampai diganti di M5 bagian 3 |
+| Endpoint lama `POST /skills/{id}/logo` | ✅ dihapus di M5 bagian 3 (diganti `POST /admin/uploads?kind=skill_logo`) |
 | Jest + jsdom 31 | `npm test` memakai `NODE_OPTIONS=--experimental-vm-modules` karena dependensi jsdom ESM-only; runtime Node 26 memuatnya native |
-| **M5 (bagian 3)** skills (kategori, urutan, `is_published`, logo via media) & social links (ganti `social_media`) — mengubah tabel/endpoint lama | ⏳ |
-| Tes unit + route + kontrak | 500 lulus, termasuk 143 skenario kontrak OpenAPI |
-| Tes integrasi `npm run test:integration` (DB tes + MinIO sungguhan) | 43 lulus (termasuk alur media MinIO): repository timeline/profile/kategori/project, endpoint publik, alur auth ujung-ke-ujung, constraint skema |
+| **M5 (bagian 3)** skills: `category_id` (FK RESTRICT), `sort_order`, logo via media (`skill_logo`), `is_published` (terbit ⇒ logo), nama unik per kategori; `description` (K14) & `logo_url` dihapus | ✅ kode + migrasi diuji di DB tes (maju/mundur/maju, gladi data produksi). ⏳ **belum dijalankan di `portfolio_db`** |
+| **M5 (bagian 3)** admin `/admin/skills` CRUD + reorder per kategori; kategori: `skill_count` + DELETE 409 bila berisi skill | ✅ |
+| **M5 (bagian 3)** `social_links` menggantikan `social_media` (data disalin: lowercase, `twitter`→`x`, urutan dipertahankan; `username` dibuang); admin `/admin/social-links` CRUD + reorder; label kustom / default platform | ✅ — memperbaiki C10 (`linkedIn`) di level data |
+| **M5 (bagian 3)** publik `GET /skills` per kategori; `/portfolio` kini memuat `skills`; endpoint lama `/skills*`, `/skills/{id}/logo`, `/profile/social-media*` dihapus (K9) | ✅ — menutup S3 lama & S7 sepenuhnya |
+| Tes perakitan container asli (`src/infrastructure/container.test.js`) | ✅ ditambahkan setelah tes integrasi menangkap dependensi `GetPortfolio` yang lupa diteruskan |
+| Tes unit + route + kontrak | 498 lulus (39 suite) |
+| Tes integrasi `npm run test:integration` (DB tes + MinIO sungguhan) | 52 lulus (termasuk alur media MinIO): repository timeline/profile/kategori/project, endpoint publik, alur auth ujung-ke-ujung, constraint skema |
 
 ---
 

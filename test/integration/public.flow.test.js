@@ -72,6 +72,16 @@ describe('Endpoint publik (MariaDB tes)', () => {
     expect(result.data.social_links.every((l) => l.label && l.url)).toBe(true);
   });
 
+  it('GET /skills dan /social-links memakai tabel baru (hanya yang terbit)', async () => {
+    const skills = (await get('/skills')).result.data;
+    expect(Array.isArray(skills)).toBe(true);
+    expect(skills.every((group) => group.items.length > 0)).toBe(true);
+
+    const links = (await get('/social-links')).result.data;
+    expect(links.every((link) => link.label && /^https:/.test(link.url))).toBe(true);
+    expect(links.map((link) => link.platform)).not.toContain('twitter');
+  });
+
   it('ETag dari data sungguhan menghasilkan 304 pada request berikutnya', async () => {
     const first = await get('/timeline');
     const second = await get('/timeline', { 'if-none-match': first.headers.etag });

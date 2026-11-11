@@ -16,38 +16,7 @@ const NotFoundError = require('../../src/exceptions/NotFoundError');
 const AuthenticationError = require('../../src/exceptions/AuthenticationError');
 const UnauthorizedError = require('../../src/exceptions/UnauthorizedError');
 
-const skill = {
-  id: 1,
-  name: 'Node.js',
-  logoUrl: null,
-  description: 'Runtime JavaScript',
-  enabled: true,
-  createdAt: new Date('2026-01-01T00:00:00Z'),
-  updatedAt: new Date('2026-01-02T00:00:00Z'),
-};
-const socialMedia = {
-  id: 1,
-  platform: 'github',
-  url: 'https://github.com/example',
-  username: 'example',
-  enabled: true,
-};
 const notFound = () => Promise.reject(new NotFoundError('Resource was not found.'));
-
-const multipart = (type, sizeBytes = 10) => {
-  const boundary = 'batas-kontrak';
-  return {
-    headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
-    payload: Buffer.concat([
-      Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="logo"; filename="f"\r\n` +
-          `Content-Type: ${type}\r\n\r\n`
-      ),
-      Buffer.alloc(sizeBytes, 'a'),
-      Buffer.from(`\r\n--${boundary}--\r\n`),
-    ]),
-  };
-};
 
 // [method, routePath (sesuai openapi), url, opsi inject, setup mock]
 const scenarios = [
@@ -128,153 +97,6 @@ const scenarios = [
     () => container.getCurrentAdmin.execute.mockResolvedValue({ id: 1, username: 'admin' }),
   ],
   ['GET', '/admin/auth/me', '/admin/auth/me', {}],
-  [
-    'GET',
-    '/skills',
-    '/skills',
-    {},
-    () =>
-      container.listSkills.execute.mockResolvedValue({
-        data: [skill],
-        meta: { page: 1, limit: 10, total: 1 },
-      }),
-  ],
-  ['GET', '/skills', '/skills?limit=1000', {}],
-  [
-    'POST',
-    '/skills',
-    '/skills',
-    { auth: true, payload: { name: 'Node.js' } },
-    () => container.createSkill.execute.mockResolvedValue(skill),
-  ],
-  ['POST', '/skills', '/skills', { auth: true, payload: {} }],
-  ['POST', '/skills', '/skills', { payload: { name: 'Node.js' } }],
-
-  [
-    'GET',
-    '/skills/{id}',
-    '/skills/1',
-    {},
-    () => container.getSkill.execute.mockResolvedValue(skill),
-  ],
-  ['GET', '/skills/{id}', '/skills/abc', {}],
-  [
-    'GET',
-    '/skills/{id}',
-    '/skills/99',
-    {},
-    () => container.getSkill.execute.mockImplementation(notFound),
-  ],
-  [
-    'PUT',
-    '/skills/{id}',
-    '/skills/1',
-    { auth: true, payload: { name: 'A', description: null, enabled: true } },
-    () => container.updateSkill.execute.mockResolvedValue(skill),
-  ],
-  ['PUT', '/skills/{id}', '/skills/1', { auth: true, payload: { name: 'A' } }],
-  [
-    'PUT',
-    '/skills/{id}',
-    '/skills/1',
-    { payload: { name: 'A', description: null, enabled: true } },
-  ],
-  [
-    'PUT',
-    '/skills/{id}',
-    '/skills/99',
-    { auth: true, payload: { name: 'A', description: null, enabled: true } },
-    () => container.updateSkill.execute.mockImplementation(notFound),
-  ],
-  [
-    'DELETE',
-    '/skills/{id}',
-    '/skills/1',
-    { auth: true },
-    () => container.deleteSkill.execute.mockResolvedValue(undefined),
-  ],
-  ['DELETE', '/skills/{id}', '/skills/abc', { auth: true }],
-  ['DELETE', '/skills/{id}', '/skills/1', {}],
-  [
-    'DELETE',
-    '/skills/{id}',
-    '/skills/99',
-    { auth: true },
-    () => container.deleteSkill.execute.mockImplementation(notFound),
-  ],
-
-  [
-    'POST',
-    '/skills/{id}/logo',
-    '/skills/1/logo',
-    { auth: true, ...multipart('image/png') },
-    () => container.uploadSkillLogo.execute.mockResolvedValue(skill),
-  ],
-  ['POST', '/skills/{id}/logo', '/skills/abc/logo', { auth: true, ...multipart('image/png') }],
-  ['POST', '/skills/{id}/logo', '/skills/1/logo', multipart('image/png')],
-  [
-    'POST',
-    '/skills/{id}/logo',
-    '/skills/99/logo',
-    { auth: true, ...multipart('image/png') },
-    () => container.uploadSkillLogo.execute.mockImplementation(notFound),
-  ],
-  [
-    'POST',
-    '/skills/{id}/logo',
-    '/skills/1/logo',
-    { auth: true, ...multipart('image/png', 2 * 1024 * 1024 + 1) },
-  ],
-  ['POST', '/skills/{id}/logo', '/skills/1/logo', { auth: true, ...multipart('image/gif') }],
-
-  [
-    'GET',
-    '/profile/social-media',
-    '/profile/social-media',
-    {},
-    () => container.listSocialMedia.execute.mockResolvedValue([socialMedia]),
-  ],
-  [
-    'GET',
-    '/profile/social-media/{platform}',
-    '/profile/social-media/github',
-    {},
-    () => container.getSocialMediaByPlatform.execute.mockResolvedValue(socialMedia),
-  ],
-  ['GET', '/profile/social-media/{platform}', '/profile/social-media/myspace', {}],
-  [
-    'GET',
-    '/profile/social-media/{platform}',
-    '/profile/social-media/github',
-    {},
-    () => container.getSocialMediaByPlatform.execute.mockImplementation(notFound),
-  ],
-  [
-    'PUT',
-    '/profile/social-media/{platform}',
-    '/profile/social-media/github',
-    { auth: true, payload: { enabled: false } },
-    () => container.updateSocialMedia.execute.mockResolvedValue(socialMedia),
-  ],
-  [
-    'PUT',
-    '/profile/social-media/{platform}',
-    '/profile/social-media/github',
-    { auth: true, payload: { url: 'bukan url' } },
-  ],
-  [
-    'PUT',
-    '/profile/social-media/{platform}',
-    '/profile/social-media/github',
-    { payload: { enabled: false } },
-  ],
-  [
-    'PUT',
-    '/profile/social-media/{platform}',
-    '/profile/social-media/github',
-    { auth: true, payload: { enabled: false } },
-    () => container.updateSocialMedia.execute.mockImplementation(notFound),
-  ],
 ];
 
 // --- Profile & timeline (M5) ---
@@ -527,7 +349,7 @@ scenarios.push(
     '/admin/skill-categories',
     '/admin/skill-categories',
     { auth: true },
-    resolves('listSkillCategories', [category]),
+    resolves('listSkillCategories', [{ ...category, skillCount: 2 }]),
   ],
   ['GET', '/admin/skill-categories', '/admin/skill-categories', {}],
   [
@@ -704,6 +526,28 @@ scenarios.push(
   ]
 );
 
+// Fixture skill dipakai skenario publik (M6) dan admin (M5 bagian 3).
+const skillLogo = {
+  id: 5,
+  kind: 'skill_logo',
+  objectKey: 'skill_logo/u.svg',
+  mime: 'image/svg+xml',
+  width: 64,
+  height: 64,
+  variants: { original: 'skill_logo/u.svg' },
+};
+const skill = {
+  id: 1,
+  categoryId: 1,
+  name: 'Node.js',
+  logoMediaId: 5,
+  logo: skillLogo,
+  isPublished: true,
+  sortOrder: 1,
+  createdAt: new Date('2026-11-11T00:00:00Z'),
+  updatedAt: new Date('2026-11-11T00:00:00Z'),
+};
+
 // --- Public (M6) ---
 const publicTimeline = { education: [], work_organization: [organization] };
 const publicSocial = [
@@ -718,6 +562,7 @@ scenarios.push(
     {},
     resolves('getPortfolio', {
       profile,
+      skills: [{ category, items: [skill] }],
       projects: { items: [project], total: 1, hasMore: false },
       timeline: publicTimeline,
       socialLinks: publicSocial,
@@ -831,6 +676,212 @@ scenarios.push(
     '/admin/profile',
     { auth: true },
     resolves('getProfile', { ...profile, photo: { ...uploadedMedia, kind: 'profile_photo' } }),
+  ]
+);
+
+// --- Skills & social links (M5 bagian 3) ---
+const socialLink = {
+  id: 1,
+  platform: 'github',
+  label: null,
+  url: 'https://github.com/a',
+  isPublished: true,
+  sortOrder: 1,
+};
+
+scenarios.push(
+  [
+    'GET',
+    '/skills',
+    '/skills',
+    {},
+    resolves('listPublishedSkills', [{ category, items: [skill] }]),
+  ],
+  [
+    'DELETE',
+    '/admin/skill-categories/{id}',
+    '/admin/skill-categories/1',
+    { auth: true },
+    rejects('deleteSkillCategory', conflict),
+  ],
+
+  [
+    'GET',
+    '/admin/skills',
+    '/admin/skills?category_id=1',
+    { auth: true },
+    resolves('listSkills', [skill]),
+  ],
+  ['GET', '/admin/skills', '/admin/skills?category_id=abc', { auth: true }],
+  ['GET', '/admin/skills', '/admin/skills', {}],
+  [
+    'POST',
+    '/admin/skills',
+    '/admin/skills',
+    { auth: true, payload: { category_id: 1, name: 'Node.js', logo_id: 5 } },
+    resolves('createSkill', skill),
+  ],
+  ['POST', '/admin/skills', '/admin/skills', { auth: true, payload: { name: 'x' } }],
+  ['POST', '/admin/skills', '/admin/skills', { payload: { category_id: 1, name: 'x' } }],
+  [
+    'POST',
+    '/admin/skills',
+    '/admin/skills',
+    { auth: true, payload: { category_id: 1, name: 'x' } },
+    rejects('createSkill', conflict),
+  ],
+  [
+    'PATCH',
+    '/admin/skills/reorder',
+    '/admin/skills/reorder',
+    { auth: true, payload: { category_id: 1, ids: [2, 1] } },
+    resolves('reorderSkills', undefined),
+  ],
+  [
+    'PATCH',
+    '/admin/skills/reorder',
+    '/admin/skills/reorder',
+    { auth: true, payload: { ids: [1] } },
+  ],
+  [
+    'PATCH',
+    '/admin/skills/reorder',
+    '/admin/skills/reorder',
+    { payload: { category_id: 1, ids: [1] } },
+  ],
+  [
+    'PATCH',
+    '/admin/skills/reorder',
+    '/admin/skills/reorder',
+    { auth: true, payload: { category_id: 9, ids: [1] } },
+    rejects('reorderSkills', notFound),
+  ],
+  ['GET', '/admin/skills/{id}', '/admin/skills/1', { auth: true }, resolves('getSkill', skill)],
+  ['GET', '/admin/skills/{id}', '/admin/skills/abc', { auth: true }],
+  ['GET', '/admin/skills/{id}', '/admin/skills/1', {}],
+  ['GET', '/admin/skills/{id}', '/admin/skills/99', { auth: true }, rejects('getSkill', notFound)],
+  [
+    'PATCH',
+    '/admin/skills/{id}',
+    '/admin/skills/1',
+    { auth: true, payload: { name: 'Node' } },
+    resolves('updateSkill', skill),
+  ],
+  ['PATCH', '/admin/skills/{id}', '/admin/skills/1', { auth: true, payload: {} }],
+  ['PATCH', '/admin/skills/{id}', '/admin/skills/1', { payload: { name: 'x' } }],
+  [
+    'PATCH',
+    '/admin/skills/{id}',
+    '/admin/skills/99',
+    { auth: true, payload: { name: 'x' } },
+    rejects('updateSkill', notFound),
+  ],
+  [
+    'PATCH',
+    '/admin/skills/{id}',
+    '/admin/skills/1',
+    { auth: true, payload: { name: 'x' } },
+    rejects('updateSkill', conflict),
+  ],
+  [
+    'DELETE',
+    '/admin/skills/{id}',
+    '/admin/skills/1',
+    { auth: true },
+    resolves('deleteSkill', undefined),
+  ],
+  ['DELETE', '/admin/skills/{id}', '/admin/skills/abc', { auth: true }],
+  ['DELETE', '/admin/skills/{id}', '/admin/skills/1', {}],
+  [
+    'DELETE',
+    '/admin/skills/{id}',
+    '/admin/skills/99',
+    { auth: true },
+    rejects('deleteSkill', notFound),
+  ],
+
+  [
+    'GET',
+    '/admin/social-links',
+    '/admin/social-links',
+    { auth: true },
+    resolves('listSocialLinks', [socialLink]),
+  ],
+  ['GET', '/admin/social-links', '/admin/social-links', {}],
+  [
+    'POST',
+    '/admin/social-links',
+    '/admin/social-links',
+    { auth: true, payload: { platform: 'github', url: 'https://github.com/a' } },
+    resolves('createSocialLink', socialLink),
+  ],
+  [
+    'POST',
+    '/admin/social-links',
+    '/admin/social-links',
+    { auth: true, payload: { platform: 'myspace', url: 'https://a.b' } },
+  ],
+  [
+    'POST',
+    '/admin/social-links',
+    '/admin/social-links',
+    { payload: { platform: 'github', url: 'https://a.b' } },
+  ],
+  [
+    'PATCH',
+    '/admin/social-links/reorder',
+    '/admin/social-links/reorder',
+    { auth: true, payload: { ids: [1] } },
+    resolves('reorderSocialLinks', undefined),
+  ],
+  [
+    'PATCH',
+    '/admin/social-links/reorder',
+    '/admin/social-links/reorder',
+    { auth: true, payload: { ids: [] } },
+  ],
+  [
+    'PATCH',
+    '/admin/social-links/reorder',
+    '/admin/social-links/reorder',
+    { payload: { ids: [1] } },
+  ],
+  [
+    'PATCH',
+    '/admin/social-links/{id}',
+    '/admin/social-links/1',
+    { auth: true, payload: { label: 'Kode' } },
+    resolves('updateSocialLink', socialLink),
+  ],
+  [
+    'PATCH',
+    '/admin/social-links/{id}',
+    '/admin/social-links/1',
+    { auth: true, payload: { url: 'http://a.b' } },
+  ],
+  ['PATCH', '/admin/social-links/{id}', '/admin/social-links/1', { payload: { label: 'x' } }],
+  [
+    'PATCH',
+    '/admin/social-links/{id}',
+    '/admin/social-links/99',
+    { auth: true, payload: { label: 'x' } },
+    rejects('updateSocialLink', notFound),
+  ],
+  [
+    'DELETE',
+    '/admin/social-links/{id}',
+    '/admin/social-links/1',
+    { auth: true },
+    resolves('deleteSocialLink', undefined),
+  ],
+  ['DELETE', '/admin/social-links/{id}', '/admin/social-links/abc', { auth: true }],
+  ['DELETE', '/admin/social-links/{id}', '/admin/social-links/1', {}],
+  [
+    'DELETE',
+    '/admin/social-links/{id}',
+    '/admin/social-links/99',
+    { auth: true },
+    rejects('deleteSocialLink', notFound),
   ]
 );
 
