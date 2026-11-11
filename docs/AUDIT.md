@@ -64,11 +64,15 @@ Perintah yang dijalankan (read-only): `npm ls`, `npm outdated`, `npm audit`,
 | C11 `docs/openapi.yaml` disinkronkan (hanya endpoint yang ada, snake_case, format error baru) | ✅ dijaga tes kontrak `test/contract/openapi.test.js`: route↔dokumen, skema respons, dan cakupan setiap status |
 | Bug baru: upload logo tanpa field `logo` → 500 | ✅ jadi 400 `VALIDATION_ERROR` (validasi payload multipart) + tes regresi |
 | Lint Redocly untuk `openapi.yaml` | ⏳ belum dijalankan (unduhan paket eksternal ditolak di sesi ini) — jalankan manual: `npx @redocly/cli lint docs/openapi.yaml` |
-| **M2** login dengan `username` (K5) di `/api/v1/admin/auth/login`; `email` tetap tersimpan | ✅ kode + migrasi `add_username_to_users` (**belum dijalankan**) |
-| **M2** refresh token di cookie (K6): `refresh`, `logout`, `me`, rotasi + deteksi pemakaian ulang, hanya hash SHA-256 di DB | ✅ kode + migrasi `create_refresh_tokens_table` (**belum dijalankan**) |
+| **M2** login dengan `username` (K5) di `/api/v1/admin/auth/login`; `email` tetap tersimpan | ✅ kode + migrasi `add_username_to_users` — dijalankan di DB tes & utama 11 Nov 2026 |
+| **M2** refresh token di cookie (K6): `refresh`, `logout`, `me`, rotasi + deteksi pemakaian ulang, hanya hash SHA-256 di DB | ✅ kode + migrasi `create_refresh_tokens_table` — dijalankan di DB tes & utama 11 Nov 2026; uji ujung-ke-ujung 19/19 di DB tes |
 | S6 JWT tanpa revokasi | ✅ access token pendek (disarankan 900 dtk) + refresh token yang bisa dicabut |
 | S8 bcrypt cost 12 untuk akun yang sudah ada | ✅ rehash otomatis saat login berhasil |
 | S9 enumerasi via timing | ✅ bcrypt tetap dijalankan dengan hash palsu bila username tidak ada |
+| Verifikasi DB (8.1, 8.5) | ✅ MariaDB 11.4.12, utf8mb4/uca1400; data: 1 user, 2 skill, 5 social media. `SequelizeMeta` semula kosong (tabel dibuat sebelum sequelize-cli) — aman karena `createTable` memakai `IF NOT EXISTS` dan struktur identik dengan migrasi |
+| Backup sebelum migrasi M2 | ✅ `~/backups/portofolio-ary-api/portfolio_db-20261111-0810-sebelum-migrasi-M2.sql` (izin 600) |
+| Database tes `portfolio_test_db` | ✅ dibuat pemilik; dipakai untuk uji migrasi & e2e (berisi data palsu) |
+| User DB aplikasi `ary@%` punya `ALL PRIVILEGES` | ⏳ M7: pisahkan user aplikasi (DML saja) dan user migrasi |
 | S1 rate limit login (K11b) | ➡️ dipindah ke reverse proxy — contoh konfigurasi di §5.6; **belum terpasang** |
 | Tes | 158 lulus (25 suite), termasuk 42 skenario kontrak OpenAPI |
 
@@ -234,7 +238,7 @@ Yang perlu diperbaiki (bukan diganti):
 1. **Versi**: ⚠️ belum diketahui. 📚 MariaDB 10.6 LTS EOL Juli 2026; target
    10.11 LTS atau 11.4/11.8 LTS. (Bila ternyata MySQL: 8.0 EOL April 2026 →
    8.4 LTS.)
-2. **Charset**: `ALTER DATABASE ... CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+2. **Charset**: ✅ terverifikasi 11 Nov 2026 — server & database sudah `utf8mb4` / `utf8mb4_uca1400_ai_ci`; cukup samakan collation di migrasi baru (sebelumnya: `ALTER DATABASE ... CHARACTER SET utf8mb4`)
    + charset eksplisit di setiap migrasi baru.
 3. **User DB terpisah** untuk aplikasi dengan hak minimal (`SELECT, INSERT,
    UPDATE, DELETE` + akun terpisah untuk migrasi), ⚠️ belum diketahui.
@@ -428,7 +432,7 @@ diubah) · **Belum**.
 Reorder: validasi `ids` adalah permutasi lengkap dari himpunan saat ini
 (bila tidak → 400), lalu update `sort_order` dalam satu transaksi.
 
-### 5.3 Model data (MariaDB, `utf8mb4_unicode_ci`)
+### 5.3 Model data (MariaDB 11.4, `utf8mb4_uca1400_ai_ci`)
 
 | Tabel | Kolom utama | Constraint / indeks |
 |---|---|---|
@@ -558,7 +562,7 @@ dirilis sendiri.
 
 | # | Keputusan | Rekomendasi saya | Alternatif |
 |---|---|---|---|
-| K1 | Database | **Tetap MariaDB** (§3.6) — mohon konfirmasi versi server | PostgreSQL, SQLite |
+| K1 | Database | ✅ **Terverifikasi: MariaDB 11.4.12 (LTS), utf8mb4** — tetap MariaDB (§3.6) | PostgreSQL, SQLite |
 | K2 | Storage | **Tetap MinIO sekarang**, simpan key; pindah ke filesystem bila image tak lagi dipatch | Filesystem + reverse proxy, Garage, R2 |
 | K3 | Tipe ID | **Integer auto-increment** (konsisten, data publik) | UUID v7 (API.md) |
 | K4 | Penamaan field JSON | ✅ **Diputuskan: snake_case** (kontrak UI di API.md; frontend belum ditulis) | camelCase (perilaku kode sekarang) |

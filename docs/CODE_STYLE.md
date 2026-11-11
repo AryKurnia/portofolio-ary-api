@@ -324,7 +324,7 @@ dijalankan dua kali, password admin dari env (`ADMIN_PASSWORD`).
 **[perbaiki]**
 - Migrasi tidak menyetel `charset`/`collate`, sehingga bergantung pada default
   server (tidak bisa diverifikasi dari repo). → Tambahkan
-  `{ charset: 'utf8mb4', collate: 'utf8mb4_unicode_ci' }` pada `createTable`
+  `{ charset: 'utf8mb4', collate: 'utf8mb4_uca1400_ai_ci' }` (default server MariaDB 11.4 kita) pada `createTable`
   baru (emoji diizinkan oleh desain).
 - Seeder social media menulis `platform: 'linkedIn'`, validator menerima
   `'linkedin'`. Saat ini lolos hanya karena collation default case-insensitive.
