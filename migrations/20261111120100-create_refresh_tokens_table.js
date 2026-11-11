@@ -24,7 +24,7 @@ module.exports = {
         created_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
         updated_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
       },
-      { charset: 'utf8mb4', collate: 'utf8mb4_unicode_ci' }
+      { charset: 'utf8mb4', collate: 'utf8mb4_uca1400_ai_ci' }
     );
 
     await queryInterface.addIndex('refresh_tokens', ['user_id']);
