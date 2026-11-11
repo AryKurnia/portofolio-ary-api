@@ -8,13 +8,21 @@ module.exports = {
   },
 
   async adminUpdate(request, h) {
-    const { greeting, tagline, about, project_intro: projectIntro, email } = request.payload;
+    const {
+      greeting,
+      tagline,
+      about,
+      project_intro: projectIntro,
+      email,
+      photo_id: photoMediaId,
+    } = request.payload;
     const profile = await container.updateProfile.execute({
       greeting,
       tagline,
       about,
       projectIntro,
       email,
+      photoMediaId,
     });
     return h.response({ data: toProfileResponse(profile) }).code(200);
   },

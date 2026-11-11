@@ -1,5 +1,6 @@
 // Bentuk respons PUBLIK: hanya field yang dibutuhkan halaman portofolio (tanpa data admin).
 const { periodLabel, TYPE_LABELS } = require('../timeline/presenter');
+const { toImageResponse } = require('../shared/media');
 
 const SOCIAL_LABELS = {
   github: 'GitHub',
@@ -17,13 +18,14 @@ const toPublicProfile = (profile) => ({
   about: profile.about,
   project_intro: profile.projectIntro || null,
   email: profile.email,
+  photo: toImageResponse(profile.photo),
 });
 
-// Gambar project (URL + varian ukuran) ditambahkan bersama fitur upload di M4.
 const toPublicProject = (project) => ({
   id: project.id,
   title: project.title,
   description: project.description,
+  image: toImageResponse(project.image),
   link_url: project.linkUrl,
   show_button: project.showButton,
 });

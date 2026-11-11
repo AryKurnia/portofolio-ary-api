@@ -3,7 +3,12 @@ const Project = require('../../entities/Project');
 const ProjectModel = require('../../infrastructure/db/models/Project');
 const reorderBySortOrder = require('./reorderBySortOrder');
 
-const toProject = (row) => new Project(row.toJSON());
+const Media = require('../../entities/Media');
+
+const toProject = (row) => {
+  const { image, ...data } = row.toJSON();
+  return new Project({ ...data, image: image ? new Media(image) : null });
+};
 
 const toColumns = (project) => ({
   title: project.title,
@@ -19,6 +24,7 @@ class MariaDBProjectRepository extends ProjectRepository {
   constructor(projectModel = ProjectModel) {
     super();
     this._model = projectModel;
+    this._withImage = { include: [{ association: 'image' }] };
     this._order = [
       ['sortOrder', 'ASC'],
       ['createdAt', 'DESC'],
@@ -28,6 +34,7 @@ class MariaDBProjectRepository extends ProjectRepository {
 
   async findAll({ page = 1, limit = 12, publishedOnly = false } = {}) {
     const { rows, count } = await this._model.findAndCountAll({
+      ...this._withImage,
       where: publishedOnly ? { isPublished: true } : {},
       order: this._order,
       offset: (page - 1) * limit,
@@ -42,7 +49,7 @@ class MariaDBProjectRepository extends ProjectRepository {
   }
 
   async findById(id) {
-    const row = await this._model.findByPk(id);
+    const row = await this._model.findByPk(id, this._withImage);
     return row ? toProject(row) : null;
   }
 

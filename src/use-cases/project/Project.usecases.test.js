@@ -17,7 +17,7 @@ const existing = new Project({
   sortOrder: 1,
 });
 
-const createRepos = ({ project = existing, media = { id: 7 } } = {}) => ({
+const createRepos = ({ project = existing, media = { id: 7, kind: 'project_image' } } = {}) => ({
   projectRepository: {
     findAll: jest
       .fn()
@@ -95,6 +95,11 @@ describe('CreateProject use-case', () => {
     const r = createRepos({ media: null });
     await expect(detailsOf(createUseCase(r).execute(input))).resolves.toEqual(['image_id']);
     expect(r.projectRepository.create).not.toHaveBeenCalled();
+  });
+
+  it('menolak media berjenis lain (mis. foto profil) sebagai gambar project', async () => {
+    const r = createRepos({ media: { id: 7, kind: 'profile_photo' } });
+    await expect(detailsOf(createUseCase(r).execute(input))).resolves.toEqual(['image_id']);
   });
 
   it('menolak project terbit tanpa gambar, tanpa mengecek tabel media', async () => {

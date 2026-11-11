@@ -19,6 +19,9 @@ const MariaDBMediaRepository = require('../repositories/mariadb/MariaDBMediaRepo
 const BcryptPasswordHasher = require('./security/BcryptPasswordHasher');
 const JwtTokenManager = require('./security/JwtTokenManager');
 
+// Media
+const SharpImageProcessor = require('./media/SharpImageProcessor');
+
 // File Storage
 const minioClient = require('./storage/minioClient');
 const MinioFileStorage = require('./storage/MinioFileStorage');
@@ -70,6 +73,11 @@ const GetTimeline = require('../use-cases/public/GetTimeline');
 const ListPublicSocialLinks = require('../use-cases/public/ListPublicSocialLinks');
 const GetPortfolio = require('../use-cases/public/GetPortfolio');
 
+// Media (upload gambar)
+const UploadMedia = require('../use-cases/media/UploadMedia');
+const DeleteMedia = require('../use-cases/media/DeleteMedia');
+const CleanupOrphanMedia = require('../use-cases/media/CleanupOrphanMedia');
+
 // Media Social
 const ListSocialMedia = require('../use-cases/social-media/ListSocialMedia');
 const GetSocialMediaByPlatform = require('../use-cases/social-media/GetSocialMediaByPlatform');
@@ -94,6 +102,7 @@ const positionRepository = new MariaDBPositionRepository();
 const skillCategoryRepository = new MariaDBSkillCategoryRepository();
 const projectRepository = new MariaDBProjectRepository();
 const mediaRepository = new MariaDBMediaRepository();
+const imageProcessor = new SharpImageProcessor();
 const passwordHasher = new BcryptPasswordHasher();
 const tokenManager = new JwtTokenManager({
   secret: config.jwt.secret,
@@ -130,7 +139,13 @@ module.exports = {
   getCurrentAdmin: new GetCurrentAdmin(userRepository),
   // Profile
   getProfile,
-  updateProfile: new UpdateProfile(profileRepository),
+  updateProfile: new UpdateProfile(profileRepository, mediaRepository),
+  // Media
+  uploadMedia: new UploadMedia({ mediaRepository, fileStorage, imageProcessor, logger }),
+  deleteMedia: new DeleteMedia({ mediaRepository, fileStorage, logger }),
+  cleanupOrphanMedia: new CleanupOrphanMedia({ mediaRepository, fileStorage, logger }),
+  // Fungsi murni untuk presenter: object key → URL publik (satu-satunya ekspor non-use-case).
+  mediaUrlFor: (key) => fileStorage.getPublicUrl(key),
   // Timeline
   listOrganizations: new ListOrganizations(organizationRepository),
   createOrganization: new CreateOrganization(organizationRepository),

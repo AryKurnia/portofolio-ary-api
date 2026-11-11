@@ -34,6 +34,9 @@ const USE_CASES = [
   'getTimeline',
   'listPublicSocialLinks',
   'getPortfolio',
+  'uploadMedia',
+  'deleteMedia',
+  'cleanupOrphanMedia',
   'listSkills',
   'getSkill',
   'createSkill',
@@ -46,8 +49,10 @@ const USE_CASES = [
 ];
 
 // Dipakai di dalam factory jest.mock('.../infrastructure/container', ...).
-const createContainerMock = () =>
-  Object.fromEntries(USE_CASES.map((name) => [name, { execute: jest.fn() }]));
+const createContainerMock = () => ({
+  ...Object.fromEntries(USE_CASES.map((name) => [name, { execute: jest.fn() }])),
+  mediaUrlFor: (key) => `https://cdn.test/${key}`,
+});
 
 const createAccessToken = () => {
   const config = require('../../src/config');

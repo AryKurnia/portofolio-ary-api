@@ -8,6 +8,7 @@ const updateProfilePayloadSchema = Joi.object({
   about: plainText(1000),
   project_intro: plainText(200).allow(null, ''),
   email: Joi.string().trim().email().max(254),
+  photo_id: Joi.number().integer().positive().allow(null),
 }).min(1);
 
 module.exports = { updateProfilePayloadSchema };

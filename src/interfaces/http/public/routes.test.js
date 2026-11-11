@@ -97,6 +97,7 @@ describe('HTTP routes publik /api/v1', () => {
       'about',
       'email',
       'greeting',
+      'photo',
       'project_intro',
       'tagline',
     ]);
@@ -112,8 +113,40 @@ describe('HTTP routes publik /api/v1', () => {
       id: 1,
       title: 'FitAI',
       description: 'x',
+      image: null,
       link_url: 'https://fit.ai',
       show_button: true,
+    });
+  });
+
+  it('gambar project berisi URL utama + URL tiap varian, dibangun dari object key', async () => {
+    container.listPublishedProjects.execute.mockResolvedValue({
+      data: [
+        {
+          ...project,
+          image: {
+            id: 7,
+            objectKey: 'project_image/u-800.webp',
+            mime: 'image/webp',
+            width: 1600,
+            height: 900,
+            variants: { 400: 'project_image/u-400.webp', 800: 'project_image/u-800.webp' },
+          },
+        },
+      ],
+      meta: { page: 1, limit: 12, total: 1 },
+    });
+    const response = await get('/projects');
+    expect(response.result.data[0].image).toEqual({
+      id: 7,
+      url: 'https://cdn.test/project_image/u-800.webp',
+      width: 1600,
+      height: 900,
+      mime: 'image/webp',
+      variants: {
+        400: 'https://cdn.test/project_image/u-400.webp',
+        800: 'https://cdn.test/project_image/u-800.webp',
+      },
     });
   });
 

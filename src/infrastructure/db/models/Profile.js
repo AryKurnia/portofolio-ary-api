@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../sequelizeClient');
+const MediaModel = require('./Media');
 
 const ProfileModel = sequelize.define(
   'Profile',
@@ -14,5 +15,7 @@ const ProfileModel = sequelize.define(
   },
   { tableName: 'profile', underscored: true }
 );
+
+ProfileModel.belongsTo(MediaModel, { as: 'photo', foreignKey: 'photoMediaId' });
 
 module.exports = ProfileModel;
