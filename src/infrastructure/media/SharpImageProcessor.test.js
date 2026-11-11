@@ -80,6 +80,27 @@ describe('SharpImageProcessor', () => {
     expect(result.variants[0].buffer.toString()).not.toContain('script');
   });
 
+  it.each([
+    ['href', 'href'],
+    ['xlink:href', 'xlink:href'],
+  ])(
+    'menolak SVG yang hanya membungkus bitmap (%s="data:image/...") dengan pesan jelas',
+    async (_label, attr) => {
+      // ARRANGE — pola ekspor Figma untuk logo raster
+      const png = (await image(4, 4)).toString('base64');
+      const input = Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 4 4"><image width="4" height="4" ${attr}="data:image/png;base64,${png}"/></svg>`
+      );
+
+      // ACT
+      const error = await processor.process({ buffer: input, kind: 'skill_logo' }).catch((e) => e);
+
+      // ASSERT
+      expect(error).toBeInstanceOf(UnsupportedMediaTypeError);
+      expect(error.message).toMatch(/embedded bitmap/);
+    }
+  );
+
   it.each(['project_image', 'profile_photo'])('menolak SVG untuk %s', async (kind) => {
     const input = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>');
     await expect(processor.process({ buffer: input, kind })).rejects.toThrow(

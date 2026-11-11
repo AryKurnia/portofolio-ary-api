@@ -9,6 +9,7 @@ const { looksLikeSvg, sanitizeSvg } = require('./svgSanitizer');
 const MAX_INPUT_PIXELS = 36_000_000;
 const RASTER_FORMATS = ['png', 'jpeg', 'webp'];
 const WEBP_QUALITY = 80;
+const EMBEDDED_BITMAP = /<image\b[^>]*\bhref\s*=\s*["']\s*data:image\//i;
 
 class SharpImageProcessor extends ImageProcessor {
   async process({ buffer, kind }) {
@@ -24,7 +25,15 @@ class SharpImageProcessor extends ImageProcessor {
         'SVG is only allowed for skill logos. Use PNG, JPG or WebP.'
       );
     }
-    const clean = sanitizeSvg(buffer.toString('utf8'));
+    const text = buffer.toString('utf8');
+    // SVG ekspor desain sering hanya membungkus bitmap sebagai data: URL. Sanitizer membuang
+    // data: URL (jalur XSS), sehingga hasilnya akan kosong — tolak dengan pesan yang jelas.
+    if (EMBEDDED_BITMAP.test(text)) {
+      throw new UnsupportedMediaTypeError(
+        'This SVG only wraps an embedded bitmap image. Upload the PNG/JPG/WebP file directly or use a vector SVG.'
+      );
+    }
+    const clean = sanitizeSvg(text);
     if (!clean) {
       throw new UnsupportedMediaTypeError('The SVG file is invalid.');
     }
