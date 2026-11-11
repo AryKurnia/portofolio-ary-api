@@ -63,6 +63,47 @@ describe('UpdateSocialMedia use-case', () => {
     );
   });
 
+  it('enabled tetap false kalau tidak dikirim di payload update', async () => {
+    // ARRANGE
+    const disabledSocialMedia = { ...existingSocialMedia, enabled: false };
+    const mockSocialMediaRepository = {
+      findByPlatform: jest.fn().mockResolvedValue(disabledSocialMedia),
+      update: jest.fn().mockResolvedValue(disabledSocialMedia),
+    };
+
+    // ACT — hanya url yang dikirim, enabled tidak disebut
+    const updateSocialMedia = new UpdateSocialMedia(mockSocialMediaRepository);
+    await updateSocialMedia.execute('instagram', { url: 'https://www.instagram.com/baru/' });
+
+    // ASSERT — enabled tidak boleh kembali ke default true dari entity
+    expect(mockSocialMediaRepository.update).toHaveBeenCalledWith(
+      'instagram',
+      expect.objectContaining({ url: 'https://www.instagram.com/baru/', enabled: false })
+    );
+  });
+
+  it('url dan username tetap dari data lama kalau tidak dikirim di payload update', async () => {
+    // ARRANGE
+    const mockSocialMediaRepository = {
+      findByPlatform: jest.fn().mockResolvedValue(existingSocialMedia),
+      update: jest.fn().mockResolvedValue({ ...existingSocialMedia, enabled: false }),
+    };
+
+    // ACT — hanya enabled yang dikirim
+    const updateSocialMedia = new UpdateSocialMedia(mockSocialMediaRepository);
+    await updateSocialMedia.execute('instagram', { enabled: false });
+
+    // ASSERT
+    expect(mockSocialMediaRepository.update).toHaveBeenCalledWith(
+      'instagram',
+      expect.objectContaining({
+        url: existingSocialMedia.url,
+        username: existingSocialMedia.username,
+        enabled: false,
+      })
+    );
+  });
+
   it('melempar error NotFoundError kalau social media tidak ditemukan', async () => {
     // ARRANGE
     const mockSocialMediaRepository = {
