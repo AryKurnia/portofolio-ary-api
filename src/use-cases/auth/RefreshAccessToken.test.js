@@ -22,13 +22,11 @@ describe('RefreshAccessToken use-case', () => {
     userRepository: { findById: jest.fn().mockResolvedValue(foundUser) },
     tokenManager: {
       hashRefreshToken: jest.fn().mockReturnValue('hash-lama'),
-      createRefreshToken: jest
-        .fn()
-        .mockReturnValue({
-          token: 'refresh-baru',
-          tokenHash: 'hash-baru',
-          expiresAt: nextExpiresAt,
-        }),
+      createRefreshToken: jest.fn().mockReturnValue({
+        token: 'refresh-baru',
+        tokenHash: 'hash-baru',
+        expiresAt: nextExpiresAt,
+      }),
       createAccessToken: jest.fn().mockReturnValue({ token: 'access-baru', expiresIn: 900 }),
     },
   });
