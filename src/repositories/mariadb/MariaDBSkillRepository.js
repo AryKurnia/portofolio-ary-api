@@ -35,7 +35,12 @@ class MariaDBSkillRepository extends SkillRepository {
 
   async update(id, skill) {
     await this._skillModel.update(
-      { name: skill.name, logoUrl: skill.logoUrl, description: skill.description, enabled: skill.enabled },
+      {
+        name: skill.name,
+        logoUrl: skill.logoUrl,
+        description: skill.description,
+        enabled: skill.enabled,
+      },
       { where: { id } }
     );
     const row = await this._skillModel.findByPk(id);

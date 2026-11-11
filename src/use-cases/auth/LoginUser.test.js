@@ -23,7 +23,10 @@ describe('LoginUser use-case', () => {
     const loginUser = new LoginUser(mockUserRepository, jwtOptions);
 
     // ACT
-    const result = await loginUser.execute({ email: 'admin@example.com', password: 'plain-password' });
+    const result = await loginUser.execute({
+      email: 'admin@example.com',
+      password: 'plain-password',
+    });
 
     // ASSERT
     expect(mockUserRepository.findByEmail).toHaveBeenCalledWith('admin@example.com');
@@ -66,7 +69,9 @@ describe('LoginUser use-case', () => {
 
   it('meneruskan error kalau repository.findByEmail gagal', async () => {
     // ARRANGE
-    const mockUserRepository = { findByEmail: jest.fn().mockRejectedValue(new Error('Database connection error')) };
+    const mockUserRepository = {
+      findByEmail: jest.fn().mockRejectedValue(new Error('Database connection error')),
+    };
     const loginUser = new LoginUser(mockUserRepository, jwtOptions);
 
     // ACT

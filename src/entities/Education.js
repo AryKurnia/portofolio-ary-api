@@ -1,7 +1,15 @@
 const Entity = require('./Entity');
 
 class Education extends Entity {
-  constructor({ institution, degree, fieldOfStudy, startDate, endDate, description, ...attrs } = {}) {
+  constructor({
+    institution,
+    degree,
+    fieldOfStudy,
+    startDate,
+    endDate,
+    description,
+    ...attrs
+  } = {}) {
     super(attrs);
     this.institution = institution;
     this.degree = degree;

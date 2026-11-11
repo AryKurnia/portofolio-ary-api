@@ -21,4 +21,9 @@ const updateSkillPayloadSchema = Joi.object({
   enabled: Joi.boolean().required(),
 });
 
-module.exports = { idParamSchema, listQuerySchema, createSkillPayloadSchema, updateSkillPayloadSchema };
+module.exports = {
+  idParamSchema,
+  listQuerySchema,
+  createSkillPayloadSchema,
+  updateSkillPayloadSchema,
+};

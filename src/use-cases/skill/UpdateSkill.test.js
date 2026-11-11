@@ -8,7 +8,7 @@ describe('UpdateSkill use-case', () => {
     logoUrl: 'https://minio.../1.jpg',
     description: 'Testing framework',
     enabled: true,
-  }
+  };
 
   it('mengupdate skill dan mengembalikan hasilnya', async () => {
     // ARRANGE
@@ -31,19 +31,22 @@ describe('UpdateSkill use-case', () => {
 
     // ASSERT
     expect(mockSkillRepository.findById).toHaveBeenCalledWith(1);
-    expect(mockSkillRepository.update).toHaveBeenCalledWith(1, expect.objectContaining({
-      name: 'Updated Jest',
-      logoUrl: 'https://minio.../1.jpg',
-      description: 'Updated Testing framework',
-      enabled: false,
-    }))
+    expect(mockSkillRepository.update).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        name: 'Updated Jest',
+        logoUrl: 'https://minio.../1.jpg',
+        description: 'Updated Testing framework',
+        enabled: false,
+      })
+    );
     expect(result).toEqual({
       ...existingSkill,
       name: 'Updated Jest',
       description: 'Updated Testing framework',
       enabled: false,
     });
-  })
+  });
 
   it('mempertahankan logoUrl yang sudah ada saat update', async () => {
     // ARRANGE
@@ -74,10 +77,13 @@ describe('UpdateSkill use-case', () => {
       enabled: false,
     });
     expect(mockSkillRepository.findById).toHaveBeenCalledWith(1);
-    expect(mockSkillRepository.update).toHaveBeenCalledWith(1, expect.objectContaining({
-      logoUrl: 'https://minio.../1.jpg',
-    }))
-  })
+    expect(mockSkillRepository.update).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        logoUrl: 'https://minio.../1.jpg',
+      })
+    );
+  });
 
   it('melempar NotFoundError kalau skill tidak ditemukan', async () => {
     // ARRANGE
@@ -96,14 +102,14 @@ describe('UpdateSkill use-case', () => {
     // ASSERT
     await expect(result).rejects.toThrow(NotFoundError);
     expect(mockSkillRepository.update).not.toHaveBeenCalled();
-  })
+  });
 
   it('meneruskan error kalau repository.update gagal', async () => {
     // ARRANGE
     const mockSkillRepository = {
       findById: jest.fn().mockResolvedValue(existingSkill),
       update: jest.fn().mockRejectedValue(new Error('Database connection error')),
-    }
+    };
 
     // ACT
     const result = new UpdateSkill(mockSkillRepository).execute(1, {
@@ -114,6 +120,5 @@ describe('UpdateSkill use-case', () => {
 
     // ASSERT
     await expect(result).rejects.toThrow('Database connection error');
-  })
-})
-
+  });
+});

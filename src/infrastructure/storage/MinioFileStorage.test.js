@@ -41,8 +41,18 @@ describe('MinioFileStorage', () => {
       const storage = new MinioFileStorage(mockMinioClient, bucketName, publicBaseUrl);
 
       // ACT — upload 2 kali dengan filename asli yang sama
-      await storage.upload({ buffer: Buffer.from('a'), filename: 'logo.png', mimeType: 'image/png', folder: 'skills' });
-      await storage.upload({ buffer: Buffer.from('b'), filename: 'logo.png', mimeType: 'image/png', folder: 'skills' });
+      await storage.upload({
+        buffer: Buffer.from('a'),
+        filename: 'logo.png',
+        mimeType: 'image/png',
+        folder: 'skills',
+      });
+      await storage.upload({
+        buffer: Buffer.from('b'),
+        filename: 'logo.png',
+        mimeType: 'image/png',
+        folder: 'skills',
+      });
 
       // ASSERT
       const firstObjectName = mockMinioClient.putObject.mock.calls[0][1];

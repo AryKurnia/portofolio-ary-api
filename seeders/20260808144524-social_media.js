@@ -10,7 +10,7 @@ module.exports = {
         username: 'aryk922',
         enabled: true,
         created_at: new Date(),
-        updated_at: new Date()
+        updated_at: new Date(),
       },
       {
         platform: 'linkedin',
@@ -18,7 +18,7 @@ module.exports = {
         username: 'Ary Kurnia',
         enabled: true,
         created_at: new Date(),
-        updated_at: new Date()
+        updated_at: new Date(),
       },
       {
         platform: 'github',
@@ -26,7 +26,7 @@ module.exports = {
         username: 'AryKurnia',
         enabled: true,
         created_at: new Date(),
-        updated_at: new Date()
+        updated_at: new Date(),
       },
       {
         platform: 'facebook',
@@ -34,7 +34,7 @@ module.exports = {
         username: 'Ary Kurnia',
         enabled: true,
         created_at: new Date(),
-        updated_at: new Date()
+        updated_at: new Date(),
       },
       {
         platform: 'twitter',
@@ -42,12 +42,12 @@ module.exports = {
         username: 'AryK922',
         enabled: false,
         created_at: new Date(),
-        updated_at: new Date()
-      }
-    ])
+        updated_at: new Date(),
+      },
+    ]);
   },
 
   async down(queryInterface, Sequelize) {
     await queryInterface.bulkDelete('social_media', null, {});
-  }
+  },
 };

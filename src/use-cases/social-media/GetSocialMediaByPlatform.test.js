@@ -23,7 +23,7 @@ describe('GetSocialMediaByPlatform use-case', () => {
     // ASSERT
     expect(mockSocialMediaRepository.findByPlatform).toHaveBeenCalledWith('instagram');
     expect(result).toEqual(existingSocialMedia);
-  })
+  });
 
   it('melempar error NotFoundError kalau social media tidak ditemukan', async () => {
     // ARRANGE
@@ -38,7 +38,7 @@ describe('GetSocialMediaByPlatform use-case', () => {
     // ASSERT
     expect(mockSocialMediaRepository.findByPlatform).toHaveBeenCalledWith('nonexistent');
     await expect(result).rejects.toThrow(NotFoundError);
-  })
+  });
 
   it('melempar error kalau repository gagal', async () => {
     // ARRANGE
@@ -52,5 +52,5 @@ describe('GetSocialMediaByPlatform use-case', () => {
 
     // ASSERT
     await expect(result).rejects.toThrow('DB error');
-  })
-})
+  });
+});
