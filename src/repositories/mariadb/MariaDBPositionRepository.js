@@ -1,6 +1,7 @@
 const PositionRepository = require('../PositionRepository');
 const PositionModel = require('../../infrastructure/db/models/Position');
 const { toPosition, toPositionColumns } = require('./timelineMapping');
+const reorderBySortOrder = require('./reorderBySortOrder');
 
 class MariaDBPositionRepository extends PositionRepository {
   constructor(positionModel = PositionModel) {
@@ -31,14 +32,7 @@ class MariaDBPositionRepository extends PositionRepository {
   }
 
   async reorder(organizationId, orderedIds) {
-    await this._model.sequelize.transaction(async (transaction) => {
-      for (const [index, id] of orderedIds.entries()) {
-        await this._model.update(
-          { sortOrder: index + 1 },
-          { where: { id, organizationId }, transaction }
-        );
-      }
-    });
+    await reorderBySortOrder(this._model, orderedIds, { organizationId });
   }
 }
 
