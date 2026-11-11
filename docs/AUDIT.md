@@ -60,10 +60,17 @@ Perintah yang dijalankan (read-only): `npm ls`, `npm outdated`, `npm audit`,
 | **M1** envelope `{ data }`, presenter snake_case eksplisit (K4) — juga menutup C9 untuk resource yang ada | ✅ |
 | **M1** format error `{ error: { code, message, details? } }`, `ClientError`, `failAction` per field, pesan Inggris (K10) | ✅ |
 | **M1** CORS via `CORS_ORIGINS` (kosong = mati), `GET /api/v1/health` (503 bila DB mati), `hapi-pino` + `redact`, logger di `DeleteSkill` | ✅ |
-| Tes | 114 lulus (termasuk 37 tes kontrak OpenAPI); M1 sendiri 74: use-case + route semua plugin + perilaku lintas route (404, 500 tidak bocor, header, CORS, 413) |
+| Tes (M1) | 74: use-case + route semua plugin + perilaku lintas route (404, 500 tidak bocor, header, CORS, 413) |
 | C11 `docs/openapi.yaml` disinkronkan (hanya endpoint yang ada, snake_case, format error baru) | ✅ dijaga tes kontrak `test/contract/openapi.test.js`: route↔dokumen, skema respons, dan cakupan setiap status |
 | Bug baru: upload logo tanpa field `logo` → 500 | ✅ jadi 400 `VALIDATION_ERROR` (validasi payload multipart) + tes regresi |
 | Lint Redocly untuk `openapi.yaml` | ⏳ belum dijalankan (unduhan paket eksternal ditolak di sesi ini) — jalankan manual: `npx @redocly/cli lint docs/openapi.yaml` |
+| **M2** login dengan `username` (K5) di `/api/v1/admin/auth/login`; `email` tetap tersimpan | ✅ kode + migrasi `add_username_to_users` (**belum dijalankan**) |
+| **M2** refresh token di cookie (K6): `refresh`, `logout`, `me`, rotasi + deteksi pemakaian ulang, hanya hash SHA-256 di DB | ✅ kode + migrasi `create_refresh_tokens_table` (**belum dijalankan**) |
+| S6 JWT tanpa revokasi | ✅ access token pendek (disarankan 900 dtk) + refresh token yang bisa dicabut |
+| S8 bcrypt cost 12 untuk akun yang sudah ada | ✅ rehash otomatis saat login berhasil |
+| S9 enumerasi via timing | ✅ bcrypt tetap dijalankan dengan hash palsu bila username tidak ada |
+| S1 rate limit login (K11b) | ➡️ dipindah ke reverse proxy — contoh konfigurasi di §5.6; **belum terpasang** |
+| Tes | 158 lulus (25 suite), termasuk 42 skenario kontrak OpenAPI |
 
 ---
 
@@ -495,12 +502,36 @@ image Docker berbasis musl/Alpine) dan sanitizer SVG (mis. `dompurify` +
 |---|---|
 | CORS | `routes.cors: { origin: [PORTFOLIO_ORIGIN, ADMIN_ORIGIN], credentials: true }` dari env |
 | Header keamanan | `routes.security: { hsts: true, xframe: 'deny', noSniff: true, referrer: 'strict-origin-when-cross-origin' }` |
-| Rate limit | Login 5 / 15 menit / IP, upload 30 / jam — limiter in-memory kecil di `onPreAuth` (1 instance cukup) atau di reverse proxy (K11b) |
+| Rate limit | **Di reverse proxy (K11b).** Login 5 / 15 menit / IP, upload 30 / jam. Contoh Nginx di bawah tabel; Caddy butuh modul `caddy-ratelimit`. Pastikan proxy meneruskan IP asli dan aplikasi tidak diekspos langsung tanpa proxy. |
 | Validasi | `failAction` global → `VALIDATION_ERROR` + `details[]`; `stripUnknown` untuk payload admin |
 | Logging | `hapi-pino` dengan `redact` header auth/cookie |
 | Config | `src/config.js` tervalidasi Joi; `.env.example` lengkap |
 | Shutdown | `SIGTERM` → `server.stop()` + `sequelize.close()` |
 | Revalidasi | Setelah write sukses, panggil `FRONTEND_REVALIDATE_URL` (secret) secara fire-and-forget (K11) |
+
+Contoh rate limit di Nginx (K11b) — sesuaikan nama upstream:
+
+```nginx
+# di blok http {}
+limit_req_zone $binary_remote_addr zone=admin_login:10m rate=5r/15m;
+limit_req_zone $binary_remote_addr zone=admin_upload:10m rate=30r/h;
+
+# di blok server {}
+location = /api/v1/admin/auth/login {
+    limit_req zone=admin_login burst=5 nodelay;
+    limit_req_status 429;
+    proxy_pass http://portfolio_api;
+}
+location ~ ^/api/v1/(admin/uploads|skills/\d+/logo)$ {
+    limit_req zone=admin_upload burst=10 nodelay;
+    limit_req_status 429;
+    client_max_body_size 3m;
+    proxy_pass http://portfolio_api;
+}
+```
+
+Respons 429 dari Nginx berbentuk HTML, bukan `{ error: { code: 'RATE_LIMITED' } }`; UI cukup
+mengandalkan status 429. Bila ingin JSON, tambahkan `error_page 429` yang mengembalikan body JSON.
 
 ---
 
@@ -531,14 +562,14 @@ dirilis sendiri.
 | K2 | Storage | **Tetap MinIO sekarang**, simpan key; pindah ke filesystem bila image tak lagi dipatch | Filesystem + reverse proxy, Garage, R2 |
 | K3 | Tipe ID | **Integer auto-increment** (konsisten, data publik) | UUID v7 (API.md) |
 | K4 | Penamaan field JSON | ✅ **Diputuskan: snake_case** (kontrak UI di API.md; frontend belum ditulis) | camelCase (perilaku kode sekarang) |
-| K5 | Identitas login | **username** sesuai desain (field "Username") dengan email tetap tersimpan | Tetap email (tanpa migrasi kolom) |
-| K6 | Refresh token cookie | **Ya**, bila API & admin berada di domain induk yang sama (same-site) | Access token saja, TTL pendek, login ulang |
+| K5 | Identitas login | ✅ **Diputuskan: username** sesuai desain (field "Username") dengan email tetap tersimpan | Tetap email (tanpa migrasi kolom) |
+| K6 | Refresh token cookie | ✅ **Diputuskan: ya**, bila API & admin berada di domain induk yang sama (same-site) | Access token saja, TTL pendek, login ulang |
 | K7 | SVG | **Sanitasi** (logo teknologi umumnya SVG) | Tolak SVG / rasterisasi ke PNG/WebP |
 | K8 | Nama kolom status | **`is_published`** untuk semua resource | Tetap `enabled` |
 | K9 | Endpoint lama tanpa prefix | ✅ **Diputuskan: langsung pindah ke `/api/v1`** (tidak terlihat ada konsumen) | Pertahankan sementara dengan header `Deprecation` |
 | K10 | Bahasa pesan error API | ✅ **Diputuskan: Inggris** + `code` stabil (UI admin berbahasa Inggris) | Indonesia; atau UI memetakan dari `code` saja |
 | K11 | Frontend & revalidasi | Butuh info: framework (Next.js/Nuxt/SPA?), domain portofolio & admin, URL webhook | — |
-| K11b | Rate limit | **Di aplikasi** (portabel, teruji) | Di reverse proxy |
+| K11b | Rate limit | ✅ **Diputuskan: di reverse proxy** | Di aplikasi |
 | K12 | Twitter/X di social links | Tambah `x` ke enum, atau `other` + label | Dibuang |
 | K13 | Foto hero | **Tambah `profile.photo`** (ada di desain desktop, tidak ada di API.md) | Foto statis di frontend |
 | K14 | `skills.description` | **Hapus** (tidak ada di panel Skill) | Pertahankan sebagai opsional |

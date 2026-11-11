@@ -400,6 +400,10 @@ repository, tidak ada logika bisnis.
   skenario di `test/contract/openapi.test.js`. Tes kontrak gagal bila route tidak
   terdokumentasi, body tidak cocok skema, atau ada status terdokumentasi yang tidak diuji.
   `docs/openapi.yaml` hanya memuat endpoint yang sudah ada — rencana tetap di `docs/design/API.md`.
+- Kemampuan keamanan (hash password, token) memakai interface di `src/security/`
+  (`PasswordHasher`, `TokenManager`) dengan implementasi di `src/infrastructure/security/`,
+  sama seperti pola repository. Use-case tidak me-`require` `bcrypt`/`@hapi/jwt` langsung.
+- Waktu "sekarang" yang memengaruhi logika diinjeksi (`{ now = () => new Date() }`) agar bisa diuji.
 
 ## 10. Ringkasan cepat
 
