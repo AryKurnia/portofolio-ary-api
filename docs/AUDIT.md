@@ -74,12 +74,14 @@ Perintah yang dijalankan (read-only): `npm ls`, `npm outdated`, `npm audit`,
 | Database tes `portfolio_test_db` | ✅ dibuat pemilik; dipakai untuk uji migrasi & e2e (berisi data palsu) |
 | User DB aplikasi `ary@%` punya `ALL PRIVILEGES` | ⏳ M7: pisahkan user aplikasi (DML saja) dan user migrasi |
 | S1 rate limit login (K11b) | ➡️ dipindah ke reverse proxy — contoh konfigurasi di §5.6; **belum terpasang** |
-| **M3** tabel baru `media`, `profile`, `skill_categories`, `projects`, `organizations`, `positions` + seed konten | ✅ diuji di DB tes (maju/mundur, 16 constraint); ⏳ **belum dijalankan di `portfolio_db`** — tunggu `ADMIN_EMAIL` di `.env` + persetujuan |
+| **M3** tabel baru `media`, `profile`, `skill_categories`, `projects`, `organizations`, `positions` + seed konten | ✅ diuji di DB tes (maju/mundur, 16 constraint); ✅ dijalankan di `portfolio_db` 11 Nov 2026 setelah backup `portfolio_db-20261111-0953-sebelum-migrasi-M3.sql`; smoke test endpoint admin & lama OK |
 | **M5 (bagian 1)** admin profile: `GET/PATCH /admin/profile` | ✅ |
 | **M5 (bagian 1)** admin timeline: CRUD organizations & positions + reorder; aturan API.md §3 per field; urutan §6; `type_label`/`period_label` | ✅ |
-| **M5 (sisa)** skill categories, projects, skills (ubah tabel lama), social links (ganti `social_media`) | ⏳ |
-| Tes unit + route + kontrak | 287 lulus (33 suite), termasuk 81 skenario kontrak OpenAPI |
-| Tes integrasi `npm run test:integration` (DB tes sungguhan) | 26 lulus: repository timeline/profile, alur auth ujung-ke-ujung, constraint skema |
+| **M5 (bagian 2)** admin skill categories: CRUD + reorder (409 nama duplikat) | ✅ — `skill_count` & 409 "masih berisi skill" menyusul di bagian 3 (butuh `skills.category_id`) |
+| **M5 (bagian 2)** admin projects: CRUD + reorder + paginasi; `show_button` ⇒ link https, terbit ⇒ `image_id` yang ada | ✅ — URL gambar & varian menyusul di M4; project baru bisa terbit setelah upload tersedia |
+| **M5 (bagian 3)** skills (kategori, urutan, `is_published`, logo via media) & social links (ganti `social_media`) — mengubah tabel/endpoint lama | ⏳ |
+| Tes unit + route + kontrak | 388 lulus (39 suite), termasuk 120 skenario kontrak OpenAPI |
+| Tes integrasi `npm run test:integration` (DB tes sungguhan) | 32 lulus: repository timeline/profile/kategori/project, alur auth ujung-ke-ujung, constraint skema |
 
 ---
 

@@ -506,6 +506,204 @@ scenarios.push(
   ]
 );
 
+// --- Skill categories & projects (M5 bagian 2) ---
+const project = {
+  id: 1,
+  title: 'FitAI',
+  description: 'x',
+  imageMediaId: 7,
+  linkUrl: 'https://fit.ai',
+  showButton: true,
+  isPublished: true,
+  sortOrder: 1,
+  createdAt: new Date('2026-11-11T00:00:00Z'),
+  updatedAt: new Date('2026-11-11T00:00:00Z'),
+};
+const category = { id: 1, name: 'Backend', sortOrder: 1 };
+
+scenarios.push(
+  [
+    'GET',
+    '/admin/skill-categories',
+    '/admin/skill-categories',
+    { auth: true },
+    resolves('listSkillCategories', [category]),
+  ],
+  ['GET', '/admin/skill-categories', '/admin/skill-categories', {}],
+  [
+    'POST',
+    '/admin/skill-categories',
+    '/admin/skill-categories',
+    { auth: true, payload: { name: 'Tools' } },
+    resolves('createSkillCategory', category),
+  ],
+  [
+    'POST',
+    '/admin/skill-categories',
+    '/admin/skill-categories',
+    { auth: true, payload: { name: '' } },
+  ],
+  ['POST', '/admin/skill-categories', '/admin/skill-categories', { payload: { name: 'Tools' } }],
+  [
+    'POST',
+    '/admin/skill-categories',
+    '/admin/skill-categories',
+    { auth: true, payload: { name: 'Tools' } },
+    rejects('createSkillCategory', conflict),
+  ],
+  [
+    'PATCH',
+    '/admin/skill-categories/reorder',
+    '/admin/skill-categories/reorder',
+    { auth: true, payload: { ids: [2, 1] } },
+    resolves('reorderSkillCategories', undefined),
+  ],
+  [
+    'PATCH',
+    '/admin/skill-categories/reorder',
+    '/admin/skill-categories/reorder',
+    { auth: true, payload: { ids: [2, 1] } },
+    rejects('reorderSkillCategories', invalid),
+  ],
+  [
+    'PATCH',
+    '/admin/skill-categories/reorder',
+    '/admin/skill-categories/reorder',
+    { payload: { ids: [1] } },
+  ],
+  [
+    'PATCH',
+    '/admin/skill-categories/{id}',
+    '/admin/skill-categories/1',
+    { auth: true, payload: { name: 'X' } },
+    resolves('updateSkillCategory', category),
+  ],
+  [
+    'PATCH',
+    '/admin/skill-categories/{id}',
+    '/admin/skill-categories/1',
+    { auth: true, payload: {} },
+  ],
+  [
+    'PATCH',
+    '/admin/skill-categories/{id}',
+    '/admin/skill-categories/1',
+    { payload: { name: 'X' } },
+  ],
+  [
+    'PATCH',
+    '/admin/skill-categories/{id}',
+    '/admin/skill-categories/99',
+    { auth: true, payload: { name: 'X' } },
+    rejects('updateSkillCategory', notFound),
+  ],
+  [
+    'PATCH',
+    '/admin/skill-categories/{id}',
+    '/admin/skill-categories/1',
+    { auth: true, payload: { name: 'X' } },
+    rejects('updateSkillCategory', conflict),
+  ],
+  [
+    'DELETE',
+    '/admin/skill-categories/{id}',
+    '/admin/skill-categories/1',
+    { auth: true },
+    resolves('deleteSkillCategory', undefined),
+  ],
+  ['DELETE', '/admin/skill-categories/{id}', '/admin/skill-categories/abc', { auth: true }],
+  ['DELETE', '/admin/skill-categories/{id}', '/admin/skill-categories/1', {}],
+  [
+    'DELETE',
+    '/admin/skill-categories/{id}',
+    '/admin/skill-categories/99',
+    { auth: true },
+    rejects('deleteSkillCategory', notFound),
+  ],
+
+  [
+    'GET',
+    '/admin/projects',
+    '/admin/projects',
+    { auth: true },
+    resolves('listProjects', { data: [project], meta: { page: 1, limit: 12, total: 1 } }),
+  ],
+  ['GET', '/admin/projects', '/admin/projects?limit=99', { auth: true }],
+  ['GET', '/admin/projects', '/admin/projects', {}],
+  [
+    'POST',
+    '/admin/projects',
+    '/admin/projects',
+    { auth: true, payload: { title: 'a', description: 'b', image_id: 7 } },
+    resolves('createProject', project),
+  ],
+  ['POST', '/admin/projects', '/admin/projects', { auth: true, payload: { title: 'a' } }],
+  ['POST', '/admin/projects', '/admin/projects', { payload: { title: 'a', description: 'b' } }],
+  [
+    'PATCH',
+    '/admin/projects/reorder',
+    '/admin/projects/reorder',
+    { auth: true, payload: { ids: [2, 1] } },
+    resolves('reorderProjects', undefined),
+  ],
+  ['PATCH', '/admin/projects/reorder', '/admin/projects/reorder', { auth: true, payload: {} }],
+  ['PATCH', '/admin/projects/reorder', '/admin/projects/reorder', { payload: { ids: [1] } }],
+  [
+    'GET',
+    '/admin/projects/{id}',
+    '/admin/projects/1',
+    { auth: true },
+    resolves('getProject', project),
+  ],
+  ['GET', '/admin/projects/{id}', '/admin/projects/abc', { auth: true }],
+  ['GET', '/admin/projects/{id}', '/admin/projects/1', {}],
+  [
+    'GET',
+    '/admin/projects/{id}',
+    '/admin/projects/99',
+    { auth: true },
+    rejects('getProject', notFound),
+  ],
+  [
+    'PATCH',
+    '/admin/projects/{id}',
+    '/admin/projects/1',
+    { auth: true, payload: { title: 'x' } },
+    resolves('updateProject', project),
+  ],
+  [
+    'PATCH',
+    '/admin/projects/{id}',
+    '/admin/projects/1',
+    { auth: true, payload: { link_url: null } },
+    rejects('updateProject', invalid),
+  ],
+  ['PATCH', '/admin/projects/{id}', '/admin/projects/1', { payload: { title: 'x' } }],
+  [
+    'PATCH',
+    '/admin/projects/{id}',
+    '/admin/projects/99',
+    { auth: true, payload: { title: 'x' } },
+    rejects('updateProject', notFound),
+  ],
+  [
+    'DELETE',
+    '/admin/projects/{id}',
+    '/admin/projects/1',
+    { auth: true },
+    resolves('deleteProject', undefined),
+  ],
+  ['DELETE', '/admin/projects/{id}', '/admin/projects/abc', { auth: true }],
+  ['DELETE', '/admin/projects/{id}', '/admin/projects/1', {}],
+  [
+    'DELETE',
+    '/admin/projects/{id}',
+    '/admin/projects/99',
+    { auth: true },
+    rejects('deleteProject', notFound),
+  ]
+);
+
 describe('Kontrak docs/openapi.yaml', () => {
   let server;
   const exercised = new Set();
