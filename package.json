@@ -28,7 +28,8 @@
     "test:coverage": "NODE_ENV=test jest --coverage",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:integration": "NODE_ENV=test jest --config jest.integration.config.js"
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
@@ -60,6 +61,10 @@
   "jest": {
     "setupFiles": [
       "<rootDir>/test/setupEnv.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/test/integration/"
     ]
   }
 }
