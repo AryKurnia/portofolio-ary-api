@@ -1,9 +1,16 @@
 const Repository = require('./Repository');
 
-// dibutuhkan untuk /auth/login
 class UserRepository extends Repository {
-  async findByEmail(email) {
-    this._notImplemented('findByEmail');
+  async findByUsername(username) {
+    this._notImplemented('findByUsername');
+  }
+
+  async findById(id) {
+    this._notImplemented('findById');
+  }
+
+  async updatePasswordHash(id, passwordHash) {
+    this._notImplemented('updatePasswordHash');
   }
 }
 

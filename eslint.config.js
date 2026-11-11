@@ -18,7 +18,13 @@ module.exports = [
   },
   {
     // Kelas interface & template sequelize-cli: parameter sengaja tidak dipakai (dokumentasi kontrak).
-    files: ['src/repositories/*.js', 'src/storages/*.js', 'migrations/*.js', 'seeders/*.js'],
+    files: [
+      'src/repositories/*.js',
+      'src/storages/*.js',
+      'src/security/*.js',
+      'migrations/*.js',
+      'seeders/*.js',
+    ],
     rules: { 'no-unused-vars': ['error', { args: 'none' }] },
   },
   {
