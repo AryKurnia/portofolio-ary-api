@@ -9,9 +9,13 @@ const MEDIA_REFERENCES = [
   { table: 'profile', column: 'photo_media_id' },
 ];
 
-const notReferenced = MEDIA_REFERENCES.map(
-  ({ table, column }) => `NOT EXISTS (SELECT 1 FROM ${table} WHERE ${table}.${column} = Media.id)`
-).join(' AND ');
+// Ditulis eksplisit sebagai SQL: Sequelize membuang NOT secara diam-diam bila Op.not dipakai
+// dengan literal (terbukti lewat tes integrasi), jadi jangan diganti dengan Op.not.
+const referenceChecks = MEDIA_REFERENCES.map(
+  ({ table, column }) => `EXISTS (SELECT 1 FROM ${table} WHERE ${table}.${column} = Media.id)`
+);
+const isReferencedSql = `(${referenceChecks.join(' OR ')})`;
+const notReferencedSql = `NOT ${isReferencedSql}`;
 
 const toMedia = (row) => new Media(row.toJSON());
 
@@ -46,7 +50,7 @@ class MariaDBMediaRepository extends MediaRepository {
   async isReferenced(id) {
     const row = await this._model.findOne({
       attributes: ['id'],
-      where: { id, [Op.not]: this._model.sequelize.literal(notReferenced) },
+      where: { id, [Op.and]: this._model.sequelize.literal(isReferencedSql) },
     });
     return Boolean(row);
   }
@@ -55,7 +59,7 @@ class MariaDBMediaRepository extends MediaRepository {
     const rows = await this._model.findAll({
       where: {
         createdAt: { [Op.lt]: createdBefore },
-        [Op.and]: this._model.sequelize.literal(notReferenced),
+        [Op.and]: this._model.sequelize.literal(notReferencedSql),
       },
     });
     return rows.map(toMedia);

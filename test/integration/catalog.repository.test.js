@@ -108,6 +108,23 @@ describe('Repository skill categories & projects (MariaDB tes)', () => {
     expect(await projects.findAllIds()).toEqual(expect.arrayContaining([one.id, two.id]));
   });
 
+  it('media: isReferenced membedakan media yang dipakai project dan yang tidak', async () => {
+    await query(
+      "INSERT INTO media (kind, object_key, mime, size_bytes) VALUES ('project_image', 'it/ref-a.webp', 'image/webp', 1), ('project_image', 'it/ref-b.webp', 'image/webp', 1)"
+    );
+    const [{ id: used }] = await query("SELECT id FROM media WHERE object_key = 'it/ref-a.webp'");
+    const [{ id: unused }] = await query("SELECT id FROM media WHERE object_key = 'it/ref-b.webp'");
+    await projects.create(
+      new Project({ title: `${PREFIX}Ref`, description: 'x', imageMediaId: used })
+    );
+
+    expect(await media.isReferenced(used)).toBe(true);
+    expect(await media.isReferenced(unused)).toBe(false);
+    const orphanIds = (await media.findOrphans(new Date(Date.now() + 60_000))).map((m) => m.id);
+    expect(orphanIds).toContain(unused);
+    expect(orphanIds).not.toContain(used);
+  });
+
   it('project: menghapus media mengosongkan image_media_id (ON DELETE SET NULL)', async () => {
     await query(
       "INSERT INTO media (kind, object_key, mime, size_bytes) VALUES ('project_image', 'it/hapus.webp', 'image/webp', 1)"
