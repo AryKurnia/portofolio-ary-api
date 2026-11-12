@@ -37,7 +37,7 @@ Perintah yang dijalankan (read-only): `npm ls`, `npm outdated`, `npm audit`,
 
 ---
 
-## Status perbaikan (diperbarui 11 November 2026)
+## Status perbaikan (diperbarui 12 November 2026)
 
 | Butir | Status |
 |---|---|
@@ -95,8 +95,12 @@ Perintah yang dijalankan (read-only): `npm ls`, `npm outdated`, `npm audit`,
 | Aset desain (`docs/design/asset`) diunggah lewat use-case ke `portfolio_db` + MinIO lokal | ✅ 5 logo skill (PNG tersisip di SVG Figma, 250–1129 px) → 5 skill **terbit**; `Photo.png` → foto profil; 3 gambar project → project dummy (tetap draf). ⚠️ gambar project hanya 344×200 px — varian 800/1200 tetap 344 px; sediakan versi ≥ 1200 px untuk kualitas layar besar |
 | Upload SVG yang hanya membungkus bitmap (`<image href="data:image/...">`, pola ekspor Figma) | ✅ kini ditolak 415 dengan pesan jelas (sebelumnya tersimpan sebagai logo kosong setelah sanitasi) |
 | Tes perakitan container asli (`src/infrastructure/container.test.js`) | ✅ ditambahkan setelah tes integrasi menangkap dependensi `GetPortfolio` yang lupa diteruskan |
-| Tes unit + route + kontrak | 498 lulus (39 suite) |
-| Tes integrasi `npm run test:integration` (DB tes + MinIO sungguhan) | 52 lulus (termasuk alur media MinIO): repository timeline/profile/kategori/project, endpoint publik, alur auth ujung-ke-ujung, constraint skema |
+| **M8** pesan validasi seragam (desain 12 Nov): field wajib → `This field is required.`, URL → `Enter a valid URL.` (opsi `messages` Joi global di `server.js`) | ✅ |
+| **M8** sertifikat: tabel `certificates` (tanggal DATE ↔ `YYYY-MM`, FK `file_media_id` SET NULL, CHECK periode), admin `/admin/certificates` CRUD + reorder, publik `GET /certificates` + `certificates` di `/portfolio`; aturan: kedaluwarsa ≥ terbit, terbit tidak di masa depan, terbit ⇒ file atau `credential_url` (https), file harus `certificate_file` | ✅ kode + migrasi diuji di DB tes (maju/mundur/maju); ✅ dijalankan di `portfolio_db` 12 Nov 2026 setelah backup `portfolio_db-20261112-1853-sebelum-migrasi-M8.sql` — data lama utuh, `/certificates` & `/portfolio` 200. CHECK "terbit ⇒ file/URL" tidak bisa di DB (MariaDB menolak CHECK pada kolom FK `ON DELETE SET NULL`) → dijaga use-case |
+| **M8** upload `kind=certificate_file`: PDF (dikenali dari `%PDF-` + `%%EOF`) disimpan apa adanya dengan `Content-Disposition: inline`; gambar → WebP 800/1600; batas per jenis (`Media.KIND_RULES.maxBytes`: 2 MB gambar, 5 MB sertifikat) → 413 `PayloadTooLargeError`; `size` ditambahkan di objek media; 409 hapus file juga untuk sertifikat | ✅ terverifikasi di MinIO lokal: header `content-disposition: inline` + immutable tersaji ke klien anonim. ⚠️ M7: PDF aman karena storage beda origin dengan web/API — pertahankan subdomain storage tersendiri di production |
+| Project open source (`repo_url`, sinkron GitHub, `?type=open-source`) | ⏸ ditahan pemilik 12 Nov 2026 (token GitHub belum ada) |
+| Tes unit + route + kontrak | 581 lulus (43 suite) |
+| Tes integrasi `npm run test:integration` (DB tes + MinIO sungguhan) | 59 lulus (termasuk alur media MinIO + PDF sertifikat): repository timeline/profile/kategori/project/sertifikat, endpoint publik, alur auth ujung-ke-ujung, constraint skema |
 
 ---
 
@@ -576,6 +580,7 @@ dirilis sendiri.
 | **M4** | Upload | `media` + `POST/DELETE /admin/uploads`; sharp + WebP; deteksi isi; SVG (K7); simpan key; perbaiki C3/C4/C5; job yatim; kebijakan bucket & header cache | 🟠 `sharp` native di image Docker; memori saat konversi → batasi piksel & concurrency 1 | Uji batas: 2 MB+1 → 413, PNG berekstensi .svg → 415, SVG berisi script → ditolak/bersih |
 | **M5** | CRUD admin | Use-case + repository + route untuk profile, skill-categories, skills, projects, organizations, positions, social-links, semua `reorder` (transaksi); aturan bisnis §3 API.md; perbaiki C2 | 🟡 Banyak kode, risiko teknis rendah; aturan periode/committee rawan kasus tepi → tes use-case per aturan (Testing.md) | Semua endpoint §5.2 admin teruji |
 | **M6** | Endpoint publik | `/portfolio`, `/profile`, `/skills`, `/projects`, `/timeline` (urutan §6 API.md, `period_label`, `type_label`), `/social-links`; `Cache-Control` + `ETag` | 🟡 Logika urutan timeline → tes unit khusus | Respons cocok contoh API.md §5 |
+| **M8** | Sertifikat (desain 12 Nov 2026) | Pesan validasi seragam; `certificates` + upload `certificate_file` (PDF/gambar, 5 MB); admin CRUD + reorder; publik `/certificates` + `/portfolio` | 🟡 PDF dari storage → origin terpisah, `inline`, tanpa render server | ✅ kode, DB tes & `portfolio_db` (12 Nov 2026) |
 | **M7** | Dokumentasi & operasional | `openapi.yaml` 3.1 + lint + validasi kontrak di tes; webhook revalidasi; Dockerfile + `docker-compose` (api, mariadb, minio/alternatif); script backup DB + storage; README; hapus endpoint lama; `audit_logs` (opsional) | 🟡 Drift dokumentasi → dicegah tes kontrak | Swagger UI menampilkan semua endpoint; restore dari backup teruji |
 
 ---

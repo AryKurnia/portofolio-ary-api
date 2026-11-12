@@ -406,7 +406,13 @@ repository, tidak ada logika bisnis.
 - Waktu "sekarang" yang memengaruhi logika diinjeksi (`{ now = () => new Date() }`) agar bisa diuji.
 - Pemrosesan gambar memakai interface `src/media/ImageProcessor.js` (implementasi
   `src/infrastructure/media/SharpImageProcessor.js`). Jenis file SELALU ditentukan dari isi file,
-  tidak pernah dari header/ekstensi klien.
+  tidak pernah dari header/ekstensi klien. Aturan per jenis (lebar varian, SVG/PDF diizinkan,
+  `maxBytes`) ada di `Media.KIND_RULES`; menambah jenis media = tambah entri di sana + migrasi
+  ENUM `media.kind` + kolom rujukan di `MEDIA_REFERENCES` (`MariaDBMediaRepository`) agar
+  409 hapus dan `media:cleanup` ikut mengenalinya.
+- Pesan validasi umum diseragamkan lewat `VALIDATION_MESSAGES` di `src/server.js`
+  (`This field is required.`, `Enter a valid URL.`) karena teksnya tampil langsung di form
+  admin. Pesan aturan bisnis ditulis di entity (`validate()`), bahasa Inggris, diakhiri titik.
 - Container hanya mengekspor use-case, dengan satu pengecualian: `mediaUrlFor(key)` (fungsi murni
   object key → URL publik) yang dipakai presenter lewat `src/interfaces/http/shared/media.js`.
 - Simpan *object key* di database, bukan URL penuh; URL dibentuk saat respons.
