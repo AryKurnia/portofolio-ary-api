@@ -5,6 +5,7 @@ const Media = require('../../entities/Media');
 const NotFoundError = require('../../exceptions/NotFoundError');
 const ConflictError = require('../../exceptions/ConflictError');
 const UnsupportedMediaTypeError = require('../../exceptions/UnsupportedMediaTypeError');
+const PayloadTooLargeError = require('../../exceptions/PayloadTooLargeError');
 
 const processed = {
   mime: 'image/webp',
@@ -103,6 +104,59 @@ describe('UploadMedia use-case', () => {
     ).rejects.toThrow(UnsupportedMediaTypeError);
     expect(deps.fileStorage.putObject).not.toHaveBeenCalled();
     expect(deps.mediaRepository.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['project_image', 2],
+    ['certificate_file', 5],
+  ])('menolak file %s yang melebihi %i MB sebelum diproses (413)', async (kind, mb) => {
+    const deps = createDeps();
+    const error = await new UploadMedia(deps)
+      .execute({ kind, buffer: Buffer.alloc(mb * 1024 * 1024 + 1) })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(PayloadTooLargeError);
+    expect(error.statusCode).toBe(413);
+    expect(error.message).toBe(`File must be ${mb} MB or smaller.`);
+    expect(deps.imageProcessor.process).not.toHaveBeenCalled();
+  });
+
+  it('file sertifikat 3 MB diterima (batas 5 MB), gambar project 3 MB ditolak', async () => {
+    const buffer = Buffer.alloc(3 * 1024 * 1024);
+    await expect(
+      new UploadMedia(createDeps()).execute({ kind: 'certificate_file', buffer })
+    ).resolves.toBeDefined();
+    await expect(
+      new UploadMedia(createDeps()).execute({ kind: 'project_image', buffer })
+    ).rejects.toThrow(PayloadTooLargeError);
+  });
+
+  it('meneruskan contentDisposition varian (PDF inline) ke storage', async () => {
+    const deps = createDeps();
+    deps.imageProcessor.process.mockResolvedValue({
+      mime: 'application/pdf',
+      width: null,
+      height: null,
+      variants: [
+        {
+          name: 'original',
+          buffer: Buffer.from('%PDF-'),
+          contentType: 'application/pdf',
+          extension: 'pdf',
+          contentDisposition: 'inline',
+        },
+      ],
+    });
+    await new UploadMedia(deps).execute({ kind: 'certificate_file', buffer: Buffer.from('%PDF-') });
+    expect(deps.fileStorage.putObject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'certificate_file/uuid-1.pdf',
+        contentType: 'application/pdf',
+        contentDisposition: 'inline',
+      })
+    );
+    expect(deps.mediaRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ mime: 'application/pdf', width: null, sizeBytes: 5 })
+    );
   });
 
   it('menghapus varian yang sudah terunggah bila upload varian berikutnya gagal', async () => {

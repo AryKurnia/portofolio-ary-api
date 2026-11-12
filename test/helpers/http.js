@@ -49,6 +49,12 @@ const USE_CASES = [
   'updateSocialLink',
   'deleteSocialLink',
   'reorderSocialLinks',
+  'listPublishedCertificates',
+  'listCertificates',
+  'createCertificate',
+  'updateCertificate',
+  'deleteCertificate',
+  'reorderCertificates',
 ];
 
 // Dipakai di dalam factory jest.mock('.../infrastructure/container', ...).

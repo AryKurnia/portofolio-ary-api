@@ -15,7 +15,7 @@ class DeleteMedia {
       throw new NotFoundError(`Media with id ${id} was not found.`);
     }
     if (await this._mediaRepository.isReferenced(id)) {
-      throw new ConflictError('This image is still used. Replace or remove it there first.');
+      throw new ConflictError('This file is still used. Replace or remove it there first.');
     }
 
     // Data dulu, lalu file (best-effort) — sama seperti DeleteSkill.

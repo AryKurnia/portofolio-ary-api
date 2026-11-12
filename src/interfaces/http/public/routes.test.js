@@ -52,6 +52,27 @@ describe('HTTP routes publik /api/v1', () => {
       },
     ],
   };
+  const certificate = {
+    id: 1,
+    name: 'CKA',
+    issuer: 'CNCF',
+    issuedAt: '2025-03',
+    expiresAt: null,
+    credentialId: 'ABC-1',
+    credentialUrl: 'https://verify.example/ABC-1',
+    fileMediaId: 8,
+    file: {
+      id: 8,
+      objectKey: 'certificate_file/u.pdf',
+      mime: 'application/pdf',
+      sizeBytes: 1234,
+      width: null,
+      height: null,
+      variants: { original: 'certificate_file/u.pdf' },
+    },
+    isPublished: true,
+    sortOrder: 1,
+  };
   const get = (url, headers = {}) =>
     server.inject({ method: 'GET', url: `/api/v1${url}`, headers });
 
@@ -232,9 +253,11 @@ describe('HTTP routes publik /api/v1', () => {
       projects: { items: [project], total: 7, hasMore: true },
       timeline,
       socialLinks: [{ platform: 'github', label: null, url: 'https://github.com/x' }],
+      certificates: [certificate],
     });
     const response = await get('/portfolio');
     expect(Object.keys(response.result.data).sort()).toEqual([
+      'certificates',
       'profile',
       'projects',
       'skills',
@@ -244,5 +267,33 @@ describe('HTTP routes publik /api/v1', () => {
     expect(response.result.data.projects).toEqual(
       expect.objectContaining({ total: 7, has_more: true })
     );
+  });
+
+  it('sertifikat publik: file hanya { url, mime, width, height }, tanpa field admin', async () => {
+    container.listPublishedCertificates.execute.mockResolvedValue([
+      certificate,
+      { ...certificate, id: 2, credentialUrl: null, file: null },
+    ]);
+    const response = await get('/certificates');
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toMatch(/public/);
+    expect(response.result.data).toEqual([
+      {
+        id: 1,
+        name: 'CKA',
+        issuer: 'CNCF',
+        issued_at: '2025-03',
+        expires_at: null,
+        credential_id: 'ABC-1',
+        credential_url: 'https://verify.example/ABC-1',
+        file: {
+          url: 'https://cdn.test/certificate_file/u.pdf',
+          mime: 'application/pdf',
+          width: null,
+          height: null,
+        },
+      },
+      expect.objectContaining({ id: 2, credential_url: null, file: null }),
+    ]);
   });
 });

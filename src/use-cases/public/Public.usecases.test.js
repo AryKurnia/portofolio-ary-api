@@ -156,6 +156,7 @@ describe('GetPortfolio use-case', () => {
     },
     getTimeline: { execute: jest.fn().mockResolvedValue({ education: [], work_organization: [] }) },
     listPublicSocialLinks: { execute: jest.fn().mockResolvedValue([{ platform: 'github' }]) },
+    listPublishedCertificates: { execute: jest.fn().mockResolvedValue([{ id: 1, name: 'CKA' }]) },
   });
 
   it('menggabungkan semua section dan mengambil 6 project teratas', async () => {
@@ -168,6 +169,7 @@ describe('GetPortfolio use-case', () => {
       projects: { items: expect.any(Array), total: 6, hasMore: false },
       timeline: { education: [], work_organization: [] },
       socialLinks: [{ platform: 'github' }],
+      certificates: [{ id: 1, name: 'CKA' }],
     });
   });
 
@@ -182,6 +184,7 @@ describe('GetPortfolio use-case', () => {
     'listPublishedProjects',
     'getTimeline',
     'listPublicSocialLinks',
+    'listPublishedCertificates',
   ])('meneruskan error kalau %s gagal', async (dependency) => {
     const deps = createDeps();
     deps[dependency].execute.mockRejectedValue(new Error(`${dependency} gagal`));

@@ -23,6 +23,21 @@ describe('MinioFileStorage', () => {
       });
     });
 
+    it('putObject menyertakan Content-Disposition bila diberikan (PDF inline)', async () => {
+      const client = { putObject: jest.fn().mockResolvedValue({}) };
+      const buffer = Buffer.from('%PDF-');
+      await new MinioFileStorage(client, bucketName, publicBaseUrl).putObject({
+        key: 'a/b.pdf',
+        buffer,
+        contentType: 'application/pdf',
+        contentDisposition: 'inline',
+      });
+      expect(client.putObject).toHaveBeenCalledWith(bucketName, 'a/b.pdf', buffer, 5, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'inline',
+      });
+    });
+
     it('deleteObject menghapus berdasarkan key', async () => {
       const client = { removeObject: jest.fn().mockResolvedValue(undefined) };
       await new MinioFileStorage(client, bucketName, publicBaseUrl).deleteObject('a/b.webp');

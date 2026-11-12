@@ -8,10 +8,11 @@ class MinioFileStorage extends FileStorage {
     this._publicBaseUrl = publicBaseUrl;
   }
 
-  async putObject({ key, buffer, contentType, cacheControl }) {
+  async putObject({ key, buffer, contentType, cacheControl, contentDisposition }) {
     await this._client.putObject(this._bucket, key, buffer, buffer.length, {
       'Content-Type': contentType,
       ...(cacheControl ? { 'Cache-Control': cacheControl } : {}),
+      ...(contentDisposition ? { 'Content-Disposition': contentDisposition } : {}),
     });
   }
 

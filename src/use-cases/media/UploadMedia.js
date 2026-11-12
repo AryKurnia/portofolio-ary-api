@@ -1,5 +1,6 @@
 const { randomUUID } = require('node:crypto');
 const Media = require('../../entities/Media');
+const PayloadTooLargeError = require('../../exceptions/PayloadTooLargeError');
 const removeObjectsQuietly = require('./removeObjectsQuietly');
 
 // Nama objek unik + konten tidak pernah berubah → aman di-cache selamanya oleh browser/CDN.
@@ -23,6 +24,12 @@ class UploadMedia {
   }
 
   async execute({ kind, buffer }) {
+    // Route membatasi payload ke batas TERBESAR; batas per jenis dicek di sini.
+    const { maxBytes } = Media.KIND_RULES[kind];
+    if (buffer.length > maxBytes) {
+      throw new PayloadTooLargeError(`File must be ${maxBytes / (1024 * 1024)} MB or smaller.`);
+    }
+
     const processed = await this._imageProcessor.process({ buffer, kind });
     const id = this._generateId();
 
@@ -36,6 +43,7 @@ class UploadMedia {
           buffer: variant.buffer,
           contentType: variant.contentType,
           cacheControl: IMMUTABLE_CACHE_CONTROL,
+          contentDisposition: variant.contentDisposition,
         });
         uploaded.push({ name: variant.name, key, size: variant.buffer.length });
       }

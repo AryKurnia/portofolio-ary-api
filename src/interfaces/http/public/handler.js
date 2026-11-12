@@ -37,4 +37,9 @@ module.exports = {
     const links = await container.listPublicSocialLinks.execute();
     return cachedResponse(h, { data: links.map(presenter.toPublicSocialLink) });
   },
+
+  async certificates(request, h) {
+    const certificates = await container.listPublishedCertificates.execute();
+    return cachedResponse(h, { data: certificates.map(presenter.toPublicCertificate) });
+  },
 };

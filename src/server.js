@@ -9,6 +9,7 @@ const logger = require('./infrastructure/logger');
 // Exceptions
 const ClientError = require('./exceptions/ClientError');
 const ValidationError = require('./exceptions/ValidationError');
+const Media = require('./entities/Media');
 
 const API_PREFIX = '/api/v1';
 
@@ -19,7 +20,10 @@ const BOOM_ERRORS = {
   403: { code: 'FORBIDDEN', message: 'You do not have access to this resource.' },
   404: { code: 'NOT_FOUND', message: 'Resource not found.' },
   409: { code: 'CONFLICT' },
-  413: { code: 'PAYLOAD_TOO_LARGE', message: 'File must be 2 MB or smaller.' },
+  413: {
+    code: 'PAYLOAD_TOO_LARGE',
+    message: `File must be ${Media.MAX_BYTES / (1024 * 1024)} MB or smaller.`,
+  },
   415: { code: 'UNSUPPORTED_MEDIA_TYPE' },
   429: { code: 'RATE_LIMITED', message: 'Too many attempts. Try again later.' },
 };
@@ -28,6 +32,15 @@ const errorResponse = (h, statusCode, { code, message, details }) =>
   h
     .response({ error: { code, message, ...(details?.length ? { details } : {}) } })
     .code(statusCode);
+
+// Pesan seragam untuk kasus yang paling sering tampil di form admin (teks sama dengan desain).
+// Pesan Joi lain (panjang maksimal, format, dsb.) tetap memakai bawaan Joi.
+const VALIDATION_MESSAGES = {
+  'any.required': 'This field is required.',
+  'string.empty': 'This field is required.',
+  'string.uri': 'Enter a valid URL.',
+  'string.uriCustomScheme': 'Enter a valid URL.',
+};
 
 // Mengubah error Joi menjadi ValidationError dengan pesan per field untuk panel form UI.
 const validationFailAction = (request, h, err) => {
@@ -55,7 +68,11 @@ const createServer = async () => {
       },
       validate: {
         failAction: validationFailAction,
-        options: { abortEarly: false, errors: { wrap: { label: false } } },
+        options: {
+          abortEarly: false,
+          errors: { wrap: { label: false } },
+          messages: VALIDATION_MESSAGES,
+        },
       },
     },
   });
@@ -90,6 +107,7 @@ const createServer = async () => {
       require('./interfaces/http/timeline/index'),
       require('./interfaces/http/skill-categories/index'),
       require('./interfaces/http/projects/index'),
+      require('./interfaces/http/certificates/index'),
       require('./interfaces/http/public/index'),
       require('./interfaces/http/uploads/index'),
     ],

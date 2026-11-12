@@ -51,6 +51,17 @@ describe('HTTP routes /api/v1/admin/social-links', () => {
     expect(container.createSocialLink.execute).not.toHaveBeenCalled();
   });
 
+  it('pesan validasi seragam untuk field wajib dan URL (teks sama dengan desain)', async () => {
+    const missing = await inject('POST', '/social-links', { platform: 'github' });
+    expect(missing.result.error.details).toEqual([
+      { field: 'url', message: 'This field is required.' },
+    ]);
+    const empty = await inject('POST', '/social-links', { platform: 'github', url: '' });
+    expect(empty.result.error.details[0].message).toBe('This field is required.');
+    const http = await inject('POST', '/social-links', { platform: 'github', url: 'http://a.b' });
+    expect(http.result.error.details[0].message).toBe('Enter a valid URL.');
+  });
+
   it('PATCH /social-links/reorder tidak tertangkap sebagai /social-links/{id}', async () => {
     container.reorderSocialLinks.execute.mockResolvedValue(undefined);
     const response = await inject('PATCH', '/social-links/reorder', { ids: [2, 1] });

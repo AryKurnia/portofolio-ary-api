@@ -1,6 +1,7 @@
 class FileStorage {
   // Bekerja dengan object key (bukan URL); URL publik dibentuk lewat getPublicUrl.
-  async putObject({ key, buffer, contentType, cacheControl }) {
+  // contentDisposition opsional, mis. 'inline' agar PDF dibuka di tab browser, bukan diunduh.
+  async putObject({ key, buffer, contentType, cacheControl, contentDisposition }) {
     throw new Error(`${this.constructor.name}.putObject belum diimplementasikan`);
   }
 

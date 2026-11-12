@@ -4,19 +4,54 @@ const Media = require('../../entities/Media');
 const UnsupportedMediaTypeError = require('../../exceptions/UnsupportedMediaTypeError');
 const ValidationError = require('../../exceptions/ValidationError');
 const { looksLikeSvg, sanitizeSvg } = require('./svgSanitizer');
+const { looksLikePdf, hasEndMarker } = require('./pdf');
 
 // Batas piksel input (mis. 6000×6000) — mencegah "decompression bomb" menghabiskan memori.
 const MAX_INPUT_PIXELS = 36_000_000;
 const RASTER_FORMATS = ['png', 'jpeg', 'webp'];
 const WEBP_QUALITY = 80;
+const allowedFormatsMessage = (rules) => {
+  if (rules.allowPdf) return 'Use PDF, PNG, JPG or WebP.';
+  return rules.allowSvg ? 'Use PNG, JPG, WebP or SVG.' : 'Use PNG, JPG or WebP.';
+};
 const EMBEDDED_BITMAP = /<image\b[^>]*\bhref\s*=\s*["']\s*data:image\//i;
 
 class SharpImageProcessor extends ImageProcessor {
   async process({ buffer, kind }) {
     const rules = Media.KIND_RULES[kind];
+    if (looksLikePdf(buffer)) {
+      return this._processPdf(buffer, rules);
+    }
     return looksLikeSvg(buffer)
       ? this._processSvg(buffer, rules)
       : this._processRaster(buffer, rules);
+  }
+
+  // PDF disimpan apa adanya (tanpa render/thumbnail) dan disajikan inline agar dibuka di tab
+  // browser. Aman karena storage berada di origin terpisah dari web & API (tanpa cookie sesi).
+  async _processPdf(buffer, rules) {
+    if (!rules.allowPdf) {
+      throw new UnsupportedMediaTypeError(
+        'PDF is only allowed for certificate files. Use PNG, JPG or WebP.'
+      );
+    }
+    if (!hasEndMarker(buffer)) {
+      throw new UnsupportedMediaTypeError('The PDF file is invalid or incomplete.');
+    }
+    return {
+      mime: 'application/pdf',
+      width: null,
+      height: null,
+      variants: [
+        {
+          name: 'original',
+          buffer,
+          contentType: 'application/pdf',
+          extension: 'pdf',
+          contentDisposition: 'inline',
+        },
+      ],
+    };
   }
 
   async _processSvg(buffer, rules) {
@@ -53,11 +88,9 @@ class SharpImageProcessor extends ImageProcessor {
   }
 
   async _processRaster(buffer, rules) {
-    const metadata = await this._readMetadata(buffer);
+    const metadata = await this._readMetadata(buffer, rules);
     if (!RASTER_FORMATS.includes(metadata.format)) {
-      throw new UnsupportedMediaTypeError(
-        rules.allowSvg ? 'Use PNG, JPG, WebP or SVG.' : 'Use PNG, JPG or WebP.'
-      );
+      throw new UnsupportedMediaTypeError(allowedFormatsMessage(rules));
     }
 
     const variants = [];
@@ -80,7 +113,7 @@ class SharpImageProcessor extends ImageProcessor {
     return { mime: 'image/webp', width: oriented.width, height: oriented.height, variants };
   }
 
-  async _readMetadata(buffer) {
+  async _readMetadata(buffer, rules) {
     try {
       return await sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
     } catch (error) {
@@ -89,7 +122,9 @@ class SharpImageProcessor extends ImageProcessor {
           { field: 'file', message: 'Image dimensions are too large (max 36 megapixels).' },
         ]);
       }
-      throw new UnsupportedMediaTypeError('The file is not a supported image.');
+      throw new UnsupportedMediaTypeError(
+        `The file is not a supported format. ${allowedFormatsMessage(rules)}`
+      );
     }
   }
 }

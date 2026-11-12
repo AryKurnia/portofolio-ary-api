@@ -532,6 +532,7 @@ const skillLogo = {
   kind: 'skill_logo',
   objectKey: 'skill_logo/u.svg',
   mime: 'image/svg+xml',
+  sizeBytes: 900,
   width: 64,
   height: 64,
   variants: { original: 'skill_logo/u.svg' },
@@ -547,6 +548,122 @@ const skill = {
   createdAt: new Date('2026-11-11T00:00:00Z'),
   updatedAt: new Date('2026-11-11T00:00:00Z'),
 };
+
+// --- Certificates (M8) ---
+const certificateFile = {
+  id: 8,
+  kind: 'certificate_file',
+  objectKey: 'certificate_file/u.pdf',
+  mime: 'application/pdf',
+  sizeBytes: 120000,
+  width: null,
+  height: null,
+  variants: { original: 'certificate_file/u.pdf' },
+};
+const publicCertificate = {
+  id: 1,
+  name: 'CKA',
+  issuer: 'CNCF',
+  issuedAt: '2025-03',
+  expiresAt: null,
+  credentialId: 'ABC-1',
+  credentialUrl: 'https://verify.example/ABC-1',
+  fileMediaId: 8,
+  file: certificateFile,
+  isPublished: true,
+  sortOrder: 1,
+  createdAt: new Date('2026-11-12T00:00:00Z'),
+  updatedAt: new Date('2026-11-12T00:00:00Z'),
+};
+const certificatePayload = { name: 'CKA', issuer: 'CNCF', issued_at: '2025-03' };
+
+scenarios.push(
+  [
+    'GET',
+    '/admin/certificates',
+    '/admin/certificates',
+    { auth: true },
+    resolves('listCertificates', [publicCertificate, { ...publicCertificate, id: 2, file: null }]),
+  ],
+  ['GET', '/admin/certificates', '/admin/certificates', {}],
+  [
+    'POST',
+    '/admin/certificates',
+    '/admin/certificates',
+    { auth: true, payload: certificatePayload },
+    resolves('createCertificate', publicCertificate),
+  ],
+  [
+    'POST',
+    '/admin/certificates',
+    '/admin/certificates',
+    { auth: true, payload: { ...certificatePayload, is_published: true } },
+    rejects('createCertificate', () =>
+      Promise.reject(
+        new ValidationError('Some fields are invalid.', [
+          { field: 'file_id', message: 'Add a file or a credential URL to publish.' },
+        ])
+      )
+    ),
+  ],
+  ['POST', '/admin/certificates', '/admin/certificates', { payload: certificatePayload }],
+  [
+    'PATCH',
+    '/admin/certificates/reorder',
+    '/admin/certificates/reorder',
+    { auth: true, payload: { ids: [1] } },
+    resolves('reorderCertificates', undefined),
+  ],
+  [
+    'PATCH',
+    '/admin/certificates/reorder',
+    '/admin/certificates/reorder',
+    { auth: true, payload: { ids: [] } },
+  ],
+  [
+    'PATCH',
+    '/admin/certificates/reorder',
+    '/admin/certificates/reorder',
+    { payload: { ids: [1] } },
+  ],
+  [
+    'PATCH',
+    '/admin/certificates/{id}',
+    '/admin/certificates/1',
+    { auth: true, payload: { expires_at: null } },
+    resolves('updateCertificate', publicCertificate),
+  ],
+  [
+    'PATCH',
+    '/admin/certificates/{id}',
+    '/admin/certificates/1',
+    { auth: true, payload: { credential_url: 'http://a.b' } },
+  ],
+  ['PATCH', '/admin/certificates/{id}', '/admin/certificates/1', { payload: { name: 'x' } }],
+  [
+    'PATCH',
+    '/admin/certificates/{id}',
+    '/admin/certificates/99',
+    { auth: true, payload: { name: 'x' } },
+    rejects('updateCertificate', notFound),
+  ],
+  [
+    'DELETE',
+    '/admin/certificates/{id}',
+    '/admin/certificates/1',
+    { auth: true },
+    resolves('deleteCertificate', undefined),
+  ],
+  ['DELETE', '/admin/certificates/{id}', '/admin/certificates/abc', { auth: true }],
+  ['DELETE', '/admin/certificates/{id}', '/admin/certificates/1', {}],
+  [
+    'DELETE',
+    '/admin/certificates/{id}',
+    '/admin/certificates/99',
+    { auth: true },
+    rejects('deleteCertificate', notFound),
+  ]
+);
 
 // --- Public (M6) ---
 const publicTimeline = { education: [], work_organization: [organization] };
@@ -566,6 +683,7 @@ scenarios.push(
       projects: { items: [project], total: 1, hasMore: false },
       timeline: publicTimeline,
       socialLinks: publicSocial,
+      certificates: [publicCertificate, { ...publicCertificate, id: 2, file: null }],
     }),
   ],
   ['GET', '/portfolio', '/portfolio', {}, rejects('getPortfolio', notFound)],
@@ -583,7 +701,14 @@ scenarios.push(
   ['GET', '/projects/{id}', '/projects/abc', {}],
   ['GET', '/projects/{id}', '/projects/99', {}, rejects('getPublishedProject', notFound)],
   ['GET', '/timeline', '/timeline', {}, resolves('getTimeline', publicTimeline)],
-  ['GET', '/social-links', '/social-links', {}, resolves('listPublicSocialLinks', publicSocial)]
+  ['GET', '/social-links', '/social-links', {}, resolves('listPublicSocialLinks', publicSocial)],
+  [
+    'GET',
+    '/certificates',
+    '/certificates',
+    {},
+    resolves('listPublishedCertificates', [publicCertificate]),
+  ]
 );
 
 // --- Uploads (M4) ---
@@ -593,6 +718,7 @@ const uploadedMedia = {
   kind: 'project_image',
   objectKey: 'project_image/u-800.webp',
   mime: 'image/webp',
+  sizeBytes: 50000,
   width: 1600,
   height: 900,
   variants: { 400: 'project_image/u-400.webp', 800: 'project_image/u-800.webp' },
@@ -619,13 +745,20 @@ scenarios.push(
     { auth: true, ...fileUpload() },
     resolves('uploadMedia', uploadedMedia),
   ],
+  [
+    'POST',
+    '/admin/uploads',
+    '/admin/uploads?kind=certificate_file',
+    { auth: true, ...fileUpload() },
+    resolves('uploadMedia', certificateFile),
+  ],
   ['POST', '/admin/uploads', '/admin/uploads?kind=avatar', { auth: true, ...fileUpload() }],
   ['POST', '/admin/uploads', '/admin/uploads?kind=project_image', fileUpload()],
   [
     'POST',
     '/admin/uploads',
     '/admin/uploads?kind=project_image',
-    { auth: true, ...fileUpload(2 * 1024 * 1024 + 1) },
+    { auth: true, ...fileUpload(5 * 1024 * 1024 + 64 * 1024 + 1) },
   ],
   [
     'POST',

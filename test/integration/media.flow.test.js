@@ -42,6 +42,7 @@ describe('Alur media (MinIO + MariaDB tes)', () => {
     if (keys.length) await minioClient.removeObjects(config.minio.bucket, keys);
     await query("UPDATE projects SET image_media_id = NULL WHERE title LIKE '[it-media]%'");
     await query("DELETE FROM projects WHERE title LIKE '[it-media]%'");
+    await query("DELETE FROM certificates WHERE name LIKE '[it-media]%'");
     await query('DELETE FROM media WHERE object_key LIKE ?', [`${KEY_PREFIX}%`]);
   };
 
@@ -111,6 +112,47 @@ describe('Alur media (MinIO + MariaDB tes)', () => {
     expect(media.mime).toBe('image/svg+xml');
     expect(stored).not.toMatch(/script|onclick/);
     expect(stored).toContain('<rect');
+  });
+
+  it('PDF sertifikat: disimpan apa adanya, disajikan inline + immutable, bisa dibaca anonim', async () => {
+    // ARRANGE
+    const pdf = Buffer.from(
+      '%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n',
+      'latin1'
+    );
+
+    // ACT
+    const media = await uploadMedia.execute({ kind: 'certificate_file', buffer: pdf });
+
+    // ASSERT
+    expect(media.objectKey).toMatch(/^it-test\/certificate_file\/[0-9a-f-]{36}\.pdf$/);
+    expect(media.variants).toEqual({ original: media.objectKey });
+    const response = await fetch(fileStorage.getPublicUrl(media.objectKey));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('application/pdf');
+    expect(response.headers.get('content-disposition')).toBe('inline');
+    expect(response.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(pdf);
+    const [row] = await query('SELECT kind, mime, size_bytes, width FROM media WHERE id = ?', [
+      media.id,
+    ]);
+    expect(row).toEqual({
+      kind: 'certificate_file',
+      mime: 'application/pdf',
+      size_bytes: pdf.length,
+      width: null,
+    });
+  });
+
+  it('file yang dipakai sertifikat tidak bisa dihapus (409)', async () => {
+    const pdf = Buffer.from('%PDF-1.4\n%%EOF\n', 'latin1');
+    const media = await uploadMedia.execute({ kind: 'certificate_file', buffer: pdf });
+    await query(
+      "INSERT INTO certificates (name, issuer, issued_at, file_media_id) VALUES ('[it-media] C', 'x', '2025-03-01', ?)",
+      [media.id]
+    );
+    await expect(new DeleteMedia(deps).execute(media.id)).rejects.toThrow(ConflictError);
+    expect(await mediaRepository.isReferenced(media.id)).toBe(true);
   });
 
   it('media yang dipakai project tidak bisa dihapus; setelah dilepas, data & objek terhapus', async () => {

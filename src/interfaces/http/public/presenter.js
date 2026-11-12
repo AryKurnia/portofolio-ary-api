@@ -56,6 +56,23 @@ const toPublicSocialLink = (link) => ({
   url: link.url,
 });
 
+// File hanya berisi yang dibutuhkan tombol View: mime menentukan lightbox (gambar) atau tab baru (PDF).
+const toPublicCertificateFile = (file) =>
+  file
+    ? { url: toImageResponse(file).url, mime: file.mime, width: file.width, height: file.height }
+    : null;
+
+const toPublicCertificate = (certificate) => ({
+  id: certificate.id,
+  name: certificate.name,
+  issuer: certificate.issuer,
+  issued_at: certificate.issuedAt,
+  expires_at: certificate.expiresAt,
+  credential_id: certificate.credentialId,
+  credential_url: certificate.credentialUrl,
+  file: toPublicCertificateFile(certificate.file),
+});
+
 const toPublicSkillGroups = (groups) =>
   groups.map(({ category, items }) => ({
     category: { id: category.id, name: category.name },
@@ -66,7 +83,7 @@ const toPublicSkillGroups = (groups) =>
     })),
   }));
 
-const toPublicPortfolio = ({ profile, skills, projects, timeline, socialLinks }) => ({
+const toPublicPortfolio = ({ profile, skills, projects, timeline, socialLinks, certificates }) => ({
   profile: toPublicProfile(profile),
   skills: toPublicSkillGroups(skills),
   projects: {
@@ -76,6 +93,7 @@ const toPublicPortfolio = ({ profile, skills, projects, timeline, socialLinks })
   },
   timeline: toPublicTimeline(timeline),
   social_links: socialLinks.map(toPublicSocialLink),
+  certificates: certificates.map(toPublicCertificate),
 });
 
 module.exports = {
@@ -83,6 +101,7 @@ module.exports = {
   toPublicProject,
   toPublicTimeline,
   toPublicSocialLink,
+  toPublicCertificate,
   toPublicSkillGroups,
   toPublicPortfolio,
 };

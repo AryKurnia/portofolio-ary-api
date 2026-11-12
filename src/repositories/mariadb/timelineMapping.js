@@ -1,9 +1,7 @@
-// Konversi antara domain (tanggal 'YYYY-MM') dan kolom DATE (tanggal 1).
+// Konversi baris timeline ↔ entity (tanggal 'YYYY-MM' ↔ kolom DATE tanggal 1).
 const Organization = require('../../entities/Organization');
 const Position = require('../../entities/Position');
-
-const toYearMonth = (date) => (date ? String(date).slice(0, 7) : null);
-const toDateColumn = (yearMonth) => (yearMonth ? `${yearMonth}-01` : null);
+const { toYearMonth, toDateColumn } = require('./yearMonthColumn');
 
 const toPosition = (row) => {
   const data = row.toJSON ? row.toJSON() : row;

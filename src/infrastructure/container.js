@@ -14,6 +14,7 @@ const MariaDBPositionRepository = require('../repositories/mariadb/MariaDBPositi
 const MariaDBSkillCategoryRepository = require('../repositories/mariadb/MariaDBSkillCategoryRepository');
 const MariaDBProjectRepository = require('../repositories/mariadb/MariaDBProjectRepository');
 const MariaDBMediaRepository = require('../repositories/mariadb/MariaDBMediaRepository');
+const MariaDBCertificateRepository = require('../repositories/mariadb/MariaDBCertificateRepository');
 
 // Security
 const BcryptPasswordHasher = require('./security/BcryptPasswordHasher');
@@ -72,6 +73,7 @@ const GetPublishedProject = require('../use-cases/public/GetPublishedProject');
 const GetTimeline = require('../use-cases/public/GetTimeline');
 const ListPublicSocialLinks = require('../use-cases/public/ListPublicSocialLinks');
 const GetPortfolio = require('../use-cases/public/GetPortfolio');
+const ListPublishedCertificates = require('../use-cases/public/ListPublishedCertificates');
 
 // Media (upload gambar)
 const UploadMedia = require('../use-cases/media/UploadMedia');
@@ -93,6 +95,13 @@ const CreateSocialLink = require('../use-cases/social-link/CreateSocialLink');
 const UpdateSocialLink = require('../use-cases/social-link/UpdateSocialLink');
 const DeleteSocialLink = require('../use-cases/social-link/DeleteSocialLink');
 const ReorderSocialLinks = require('../use-cases/social-link/ReorderSocialLinks');
+
+// Certificates
+const ListCertificates = require('../use-cases/certificate/ListCertificates');
+const CreateCertificate = require('../use-cases/certificate/CreateCertificate');
+const UpdateCertificate = require('../use-cases/certificate/UpdateCertificate');
+const DeleteCertificate = require('../use-cases/certificate/DeleteCertificate');
+const ReorderCertificates = require('../use-cases/certificate/ReorderCertificates');
 // End Use-cases
 
 const skillRepository = new MariaDBSkillRepository();
@@ -105,6 +114,7 @@ const positionRepository = new MariaDBPositionRepository();
 const skillCategoryRepository = new MariaDBSkillCategoryRepository();
 const projectRepository = new MariaDBProjectRepository();
 const mediaRepository = new MariaDBMediaRepository();
+const certificateRepository = new MariaDBCertificateRepository();
 const imageProcessor = new SharpImageProcessor();
 const passwordHasher = new BcryptPasswordHasher();
 const tokenManager = new JwtTokenManager({
@@ -122,6 +132,8 @@ const getTimeline = new GetTimeline(organizationRepository);
 const skillDeps = { skillRepository, skillCategoryRepository, mediaRepository };
 const listPublishedSkills = new ListPublishedSkills(skillDeps);
 const listPublicSocialLinks = new ListPublicSocialLinks(socialLinkRepository);
+const certificateDeps = { certificateRepository, mediaRepository };
+const listPublishedCertificates = new ListPublishedCertificates(certificateDeps);
 
 module.exports = {
   // Public
@@ -130,12 +142,14 @@ module.exports = {
   getPublishedProject: new GetPublishedProject(projectRepository),
   getTimeline,
   listPublicSocialLinks,
+  listPublishedCertificates,
   getPortfolio: new GetPortfolio({
     getProfile,
     listPublishedSkills,
     listPublishedProjects,
     getTimeline,
     listPublicSocialLinks,
+    listPublishedCertificates,
   }),
   // Health
   checkHealth: new CheckHealth({ pingDatabase: () => sequelize.authenticate() }),
@@ -188,4 +202,10 @@ module.exports = {
   updateSocialLink: new UpdateSocialLink({ socialLinkRepository }),
   deleteSocialLink: new DeleteSocialLink({ socialLinkRepository }),
   reorderSocialLinks: new ReorderSocialLinks({ socialLinkRepository }),
+  // Certificates
+  listCertificates: new ListCertificates(certificateDeps),
+  createCertificate: new CreateCertificate(certificateDeps),
+  updateCertificate: new UpdateCertificate(certificateDeps),
+  deleteCertificate: new DeleteCertificate(certificateDeps),
+  reorderCertificates: new ReorderCertificates(certificateDeps),
 };

@@ -8,6 +8,7 @@ const MEDIA_REFERENCES = [
   { table: 'projects', column: 'image_media_id' },
   { table: 'profile', column: 'photo_media_id' },
   { table: 'skills', column: 'logo_media_id' },
+  { table: 'certificates', column: 'file_media_id' },
 ];
 
 // Ditulis eksplisit sebagai SQL: Sequelize membuang NOT secara diam-diam bila Op.not dipakai

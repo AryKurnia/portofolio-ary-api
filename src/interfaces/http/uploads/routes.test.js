@@ -7,6 +7,7 @@ const { createServer } = require('../../../server');
 const { authHeader } = require('../../../../test/helpers/http');
 const UnsupportedMediaTypeError = require('../../../exceptions/UnsupportedMediaTypeError');
 const ConflictError = require('../../../exceptions/ConflictError');
+const PayloadTooLargeError = require('../../../exceptions/PayloadTooLargeError');
 
 describe('HTTP routes /api/v1/admin/uploads', () => {
   let server;
@@ -85,16 +86,62 @@ describe('HTTP routes /api/v1/admin/uploads', () => {
   it('menolak multipart tanpa field file', async () => {
     const response = await upload('?kind=skill_logo', multipart({ field: 'logo' }));
     expect(response.statusCode).toBe(400);
-    expect(response.result.error.details).toEqual([{ field: 'file', message: 'file is required' }]);
+    expect(response.result.error.details).toEqual([
+      { field: 'file', message: 'This field is required.' },
+    ]);
   });
 
-  it('menolak file di atas 2 MB sebelum sampai use-case', async () => {
+  it('menolak file di atas 5 MB (batas terbesar) sebelum sampai use-case', async () => {
     const response = await upload(
-      '?kind=skill_logo',
-      multipart({ content: Buffer.alloc(2 * 1024 * 1024 + 1) })
+      '?kind=certificate_file',
+      multipart({ content: Buffer.alloc(5 * 1024 * 1024 + 64 * 1024 + 1) })
     );
     expect(response.statusCode).toBe(413);
+    expect(response.result.error).toEqual({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: 'File must be 5 MB or smaller.',
+    });
     expect(container.uploadMedia.execute).not.toHaveBeenCalled();
+  });
+
+  it('file 3 MB sampai ke use-case; batas per jenis (2 MB) dibalas 413 dari use-case', async () => {
+    container.uploadMedia.execute.mockRejectedValue(
+      new PayloadTooLargeError('File must be 2 MB or smaller.')
+    );
+    const response = await upload(
+      '?kind=skill_logo',
+      multipart({ content: Buffer.alloc(3 * 1024 * 1024) })
+    );
+    expect(response.statusCode).toBe(413);
+    expect(response.result.error.message).toBe('File must be 2 MB or smaller.');
+  });
+
+  it('kind=certificate_file: PDF dibalas dengan mime application/pdf tanpa ukuran gambar', async () => {
+    container.uploadMedia.execute.mockResolvedValue({
+      id: 8,
+      kind: 'certificate_file',
+      objectKey: 'certificate_file/u.pdf',
+      mime: 'application/pdf',
+      sizeBytes: 1234,
+      width: null,
+      height: null,
+      variants: { original: 'certificate_file/u.pdf' },
+    });
+    const response = await upload(
+      '?kind=certificate_file',
+      multipart({ type: 'application/pdf', content: '%PDF-' })
+    );
+    expect(response.statusCode).toBe(201);
+    expect(response.result.data).toEqual({
+      kind: 'certificate_file',
+      id: 8,
+      url: 'https://cdn.test/certificate_file/u.pdf',
+      mime: 'application/pdf',
+      size: 1234,
+      width: null,
+      height: null,
+      variants: { original: 'https://cdn.test/certificate_file/u.pdf' },
+    });
   });
 
   it('butuh token admin', async () => {

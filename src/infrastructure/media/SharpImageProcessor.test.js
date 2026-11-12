@@ -138,4 +138,64 @@ describe('SharpImageProcessor', () => {
     expect(error).toBeInstanceOf(ValidationError);
     expect(error.details[0].field).toBe('file');
   });
+
+  describe('file sertifikat', () => {
+    const pdf = Buffer.from('%PDF-1.7\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n', 'latin1');
+
+    it('PDF disimpan apa adanya dengan Content-Disposition inline', async () => {
+      const result = await processor.process({ buffer: pdf, kind: 'certificate_file' });
+      expect(result).toEqual({
+        mime: 'application/pdf',
+        width: null,
+        height: null,
+        variants: [
+          {
+            name: 'original',
+            buffer: pdf,
+            contentType: 'application/pdf',
+            extension: 'pdf',
+            contentDisposition: 'inline',
+          },
+        ],
+      });
+    });
+
+    it('gambar sertifikat dikonversi ke WebP 800/1600', async () => {
+      const result = await processor.process({
+        buffer: await image(2000, 1400, 'jpeg'),
+        kind: 'certificate_file',
+      });
+      expect(result.mime).toBe('image/webp');
+      expect(result.variants.map((v) => v.name)).toEqual(['800', '1600']);
+    });
+
+    it('menolak PDF terpotong (tanpa penanda %%EOF)', async () => {
+      const truncated = pdf.subarray(0, 20);
+      await expect(
+        processor.process({ buffer: truncated, kind: 'certificate_file' })
+      ).rejects.toThrow('The PDF file is invalid or incomplete.');
+    });
+
+    it.each(['project_image', 'skill_logo', 'profile_photo'])(
+      'menolak PDF untuk kind %s',
+      async (kind) => {
+        await expect(processor.process({ buffer: pdf, kind })).rejects.toThrow(
+          UnsupportedMediaTypeError
+        );
+      }
+    );
+
+    it('menolak SVG untuk sertifikat dengan daftar format yang benar', async () => {
+      const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>');
+      await expect(processor.process({ buffer: svg, kind: 'certificate_file' })).rejects.toThrow(
+        UnsupportedMediaTypeError
+      );
+    });
+
+    it('menolak file selain PDF/gambar dengan pesan format sertifikat', async () => {
+      await expect(
+        processor.process({ buffer: Buffer.from('hello'), kind: 'certificate_file' })
+      ).rejects.toThrow('Use PDF, PNG, JPG or WebP.');
+    });
+  });
 });
