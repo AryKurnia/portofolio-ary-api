@@ -1,4 +1,3 @@
-// src/interfaces/http/skills/index.js
 const routes = require('./routes');
 
 module.exports = {

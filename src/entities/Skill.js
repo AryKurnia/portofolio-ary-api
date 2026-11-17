@@ -1,12 +1,30 @@
 const Entity = require('./Entity');
 
 class Skill extends Entity {
-  constructor({ name, logoUrl, description, enabled = true, ...attrs } = {}) {
+  constructor({
+    categoryId,
+    name,
+    logoMediaId = null,
+    isPublished = true,
+    sortOrder = 0,
+    logo = null,
+    ...attrs
+  } = {}) {
     super(attrs);
+    this.categoryId = categoryId;
     this.name = name;
-    this.logoUrl = logoUrl;
-    this.description = description;
-    this.enabled = enabled;
+    this.logoMediaId = logoMediaId;
+    this.isPublished = isPublished;
+    this.sortOrder = sortOrder;
+    this.logo = logo; // Media (hanya untuk dibaca; disimpan lewat logoMediaId)
+  }
+
+  // Skill Tile di portofolio selalu menampilkan logo → skill terbit wajib punya logo.
+  validate() {
+    if (this.isPublished && !this.logoMediaId) {
+      return [{ field: 'logo_id', message: 'A published skill requires a logo.' }];
+    }
+    return [];
   }
 }
 

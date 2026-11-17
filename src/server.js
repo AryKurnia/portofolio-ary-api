@@ -1,78 +1,152 @@
-'use strict';
-
 // Dependencies
 const Jwt = require('@hapi/jwt');
 const Hapi = require('@hapi/hapi');
+const HapiPino = require('hapi-pino');
+
+const config = require('./config');
+const logger = require('./infrastructure/logger');
 
 // Exceptions
-const NotFoundError = require('./exceptions/NotFoundError');
-const AuthenticationError = require('./exceptions/AuthenticationError');
+const ClientError = require('./exceptions/ClientError');
+const ValidationError = require('./exceptions/ValidationError');
+const Media = require('./entities/Media');
 
-// Environment Variables
-require('dotenv').config();
+const API_PREFIX = '/api/v1';
 
-const init = async () => {
+// Kode error mesin-baca untuk error bawaan Hapi/Boom (lihat docs/design/API.md §4).
+const BOOM_ERRORS = {
+  400: { code: 'BAD_REQUEST' },
+  401: { code: 'UNAUTHORIZED', message: 'Missing or invalid access token.' },
+  403: { code: 'FORBIDDEN', message: 'You do not have access to this resource.' },
+  404: { code: 'NOT_FOUND', message: 'Resource not found.' },
+  409: { code: 'CONFLICT' },
+  413: {
+    code: 'PAYLOAD_TOO_LARGE',
+    message: `File must be ${Media.MAX_BYTES / (1024 * 1024)} MB or smaller.`,
+  },
+  415: { code: 'UNSUPPORTED_MEDIA_TYPE' },
+  429: { code: 'RATE_LIMITED', message: 'Too many attempts. Try again later.' },
+};
+
+const errorResponse = (h, statusCode, { code, message, details }) =>
+  h
+    .response({ error: { code, message, ...(details?.length ? { details } : {}) } })
+    .code(statusCode);
+
+// Pesan seragam untuk kasus yang paling sering tampil di form admin (teks sama dengan desain).
+// Pesan Joi lain (panjang maksimal, format, dsb.) tetap memakai bawaan Joi.
+const VALIDATION_MESSAGES = {
+  'any.required': 'This field is required.',
+  'string.empty': 'This field is required.',
+  'string.uri': 'Enter a valid URL.',
+  'string.uriCustomScheme': 'Enter a valid URL.',
+};
+
+// Mengubah error Joi menjadi ValidationError dengan pesan per field untuk panel form UI.
+const validationFailAction = (request, h, err) => {
+  const details = (err.details ?? []).map((detail) => ({
+    field: detail.path.join('.'),
+    message: detail.message,
+  }));
+  throw new ValidationError('Some fields are invalid.', details);
+};
+
+// Merakit server tanpa start() — dipakai src/index.js dan tes (server.inject).
+const createServer = async () => {
+  const { corsOrigins } = config.server;
 
   const server = Hapi.server({
-    port: process.env.SERVER_PORT || 3000,
-    host: process.env.SERVER_HOST || 'localhost'
+    port: config.server.port,
+    host: config.server.host,
+    routes: {
+      cors: corsOrigins.length ? { origin: corsOrigins, credentials: true } : false,
+      security: {
+        hsts: true,
+        xframe: 'deny',
+        noSniff: true,
+        referrer: 'strict-origin-when-cross-origin',
+      },
+      validate: {
+        failAction: validationFailAction,
+        options: {
+          abortEarly: false,
+          errors: { wrap: { label: false } },
+          messages: VALIDATION_MESSAGES,
+        },
+      },
+    },
   });
 
+  await server.register({ plugin: HapiPino, options: { instance: logger } });
   await server.register(Jwt);
 
   server.auth.strategy('jwt', 'jwt', {
-    keys: process.env.JWT_SECRET,
+    keys: config.jwt.secret,
     verify: {
-      aud: 'urn:portfolio-api',
-      iss: 'portfolio-api',
+      aud: config.jwt.audience,
+      iss: config.jwt.issuer,
       sub: false,
       exp: true,
     },
     validate: (artifacts) => ({
       isValid: true,
-      credentials: { userId: artifacts.decoded.payload.sub, email: artifacts.decoded.payload.email },
-    })
+      credentials: {
+        userId: Number(artifacts.decoded.payload.sub),
+        username: artifacts.decoded.payload.username,
+      },
+    }),
   });
 
-  await server.register(require('./interfaces/http/auth/index'));
-  await server.register(require('./interfaces/http/skills/index'));
-  await server.register(require('./interfaces/http/social-media/index'));
+  await server.register(
+    [
+      require('./interfaces/http/health/index'),
+      require('./interfaces/http/auth/index'),
+      require('./interfaces/http/skills/index'),
+      require('./interfaces/http/social-links/index'),
+      require('./interfaces/http/profile/index'),
+      require('./interfaces/http/timeline/index'),
+      require('./interfaces/http/skill-categories/index'),
+      require('./interfaces/http/projects/index'),
+      require('./interfaces/http/certificates/index'),
+      require('./interfaces/http/public/index'),
+      require('./interfaces/http/uploads/index'),
+    ],
+    { routes: { prefix: API_PREFIX } }
+  );
 
-  // Error Handling
+  // Error Handling: semua error dibalas dengan format { error: { code, message, details? } }
   server.ext('onPreResponse', (request, h) => {
     const { response } = request;
 
     if (!response.isBoom) {
+      // Data admin tidak boleh disimpan cache mana pun (API.md §9).
+      if (request.path.startsWith(`${API_PREFIX}/admin/`)) {
+        response.header('Cache-Control', 'no-store');
+      }
       return h.continue;
     }
 
-    if (response instanceof NotFoundError) {
-      return h.response({ statusCode: 404, error: 'Not Found', message: response.message }).code(404);
+    if (response instanceof ClientError) {
+      return errorResponse(h, response.statusCode, response);
     }
 
-    if (response instanceof AuthenticationError) {
-      return h.response({ statusCode: 401, error: 'Unauthorized', message: response.message }).code(401);
+    const { statusCode } = response.output;
+    if (statusCode < 500) {
+      const known = BOOM_ERRORS[statusCode] ?? { code: 'BAD_REQUEST' };
+      return errorResponse(h, statusCode, {
+        code: known.code,
+        message: known.message ?? response.output.payload.message,
+      });
     }
 
-    if (response.output.statusCode < 500) {
-      return h.continue; // error bawaan Hapi (400 validasi, 401 auth plugin, dst)
-    }
-
-    console.error('[UNHANDLED ERROR]', response);
-    return h.response({
-      statusCode: 500,
-      error: 'Internal Server Error',
-      message: 'Terjadi kesalahan pada server',
-    }).code(500);
+    request.log(['error'], response);
+    return errorResponse(h, 500, {
+      code: 'INTERNAL_ERROR',
+      message: 'Something went wrong on our side.',
+    });
   });
 
-  await server.start();
-  console.log('Server running on %s', server.info.uri);
+  return server;
 };
 
-process.on('unhandledRejection', (err) => {
-  console.log(err);
-  process.exit(1);
-});
-
-init();
+module.exports = { createServer, API_PREFIX };

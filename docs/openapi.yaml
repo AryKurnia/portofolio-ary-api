@@ -1,8 +1,23 @@
 openapi: 3.1.0
 info:
   title: Ary Portofolio API
-  description: API documentation untuk Portofolio Ary Kurnia
-  version: 1.0.0
+  description: |
+    API untuk Portofolio Ary Kurnia.
+
+    Dokumen ini hanya memuat endpoint yang **sudah diimplementasikan**. Endpoint yang
+    direncanakan (profile, projects, timeline, dsb.) ada di `docs/design/API.md` dan
+    `docs/AUDIT.md` §5, dan ditambahkan ke sini saat dibangun.
+
+    Kesesuaian dokumen ini dengan kode dijaga oleh `test/contract/openapi.test.js`:
+    setiap route harus terdokumentasi, dan setiap respons harus cocok dengan skemanya.
+
+    **Konvensi**
+    - Respons sukses: `{ "data": ... }`, list berpaginasi: `{ "data": [...], "meta": {...} }`.
+    - Respons error: `{ "error": { "code", "message", "details"? } }`.
+    - Nama field: `snake_case`. Pesan error: bahasa Inggris.
+    - Pesan validasi umum seragam: field wajib kosong → `This field is required.`,
+      URL tidak valid/bukan https → `Enter a valid URL.`
+  version: 1.1.0
   contact:
     name: Ary Kurnia
     email: aryk922@gmail.com
@@ -13,191 +28,395 @@ servers:
     description: Development server
 
 tags:
+  - name: Public
+    description: |
+      Endpoint halaman portofolio: tanpa auth, hanya data yang terbit.
+      Semua respons 200 membawa `Cache-Control: public, max-age=60, stale-while-revalidate=300`
+      dan `ETag`; kirim `If-None-Match` untuk mendapat `304 Not Modified` tanpa body.
+  - name: Health
   - name: Auth
-  - name: Profile
   - name: Skills
+  - name: Social Links
+  - name: Profile
+  - name: Timeline
+  - name: Skill Categories
   - name: Projects
-  - name: Experience
+  - name: Certificates
+  - name: Uploads
 
 security: []
 
 paths:
   # ============================================================
-  # AUTH
+  # PUBLIC (halaman portofolio)
   # ============================================================
-  /auth/login:
-    post:
-      tags: [Auth]
-      summary: Login admin
-      description: Login untuk mendapatkan JWT token, digunakan untuk mengakses endpoint write.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email, password]
-              properties:
-                email:
-                  type: string
-                  format: email
-                  example: aryk922@gmail.com
-                password:
-                  type: string
-                  format: password
-                  example: "supersecret"
+  /portfolio:
+    get:
+      tags: [Public]
+      summary: Semua data halaman utama dalam satu request (untuk SSR/ISR)
+      description: |
+        `projects.items` berisi maksimal 6 project terbit; `has_more` memunculkan tombol
+        "See all projects".
       responses:
         '200':
-          description: Login berhasil
+          description: Data portofolio
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
           content:
             application/json:
               schema:
                 type: object
+                required: [data]
                 properties:
-                  accessToken:
-                    type: string
-                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  expiresIn:
-                    type: integer
-                    example: 3600
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+                  data:
+                    type: object
+                    required: [profile, skills, projects, timeline, social_links, certificates]
+                    additionalProperties: false
+                    properties:
+                      profile: { $ref: '#/components/schemas/PublicProfile' }
+                      skills:
+                        type: array
+                        items: { $ref: '#/components/schemas/PublicSkillGroup' }
+                      projects:
+                        type: object
+                        required: [items, total, has_more]
+                        additionalProperties: false
+                        properties:
+                          items:
+                            type: array
+                            maxItems: 6
+                            items: { $ref: '#/components/schemas/PublicProject' }
+                          total: { type: integer }
+                          has_more: { type: boolean }
+                      timeline: { $ref: '#/components/schemas/PublicTimeline' }
+                      social_links:
+                        type: array
+                        items: { $ref: '#/components/schemas/PublicSocialLink' }
+                      certificates:
+                        type: array
+                        description: Semua sertifikat terbit (tanpa batas jumlah), urut sort_order.
+                        items: { $ref: '#/components/schemas/PublicCertificate' }
+        '404':
+          $ref: '#/components/responses/NotFound'
 
-  # ============================================================
-  # PROFILE
-  # ============================================================
   /profile:
     get:
-      tags: [Profile]
-      summary: Get personal information
-      description: Retrieve data profil inti (tanpa skills/projects/experience).
+      tags: [Public]
+      summary: Profil (hero, about, intro project, email kontak)
       responses:
         '200':
-          description: Successful response
+          description: Profil
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Profile'
-    put:
-      tags: [Profile]
-      summary: Update personal information
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProfileInput'
-      responses:
-        '200':
-          description: Profile berhasil diupdate
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Profile'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-
-  /profile/photo:
-    post:
-      tags: [Profile]
-      summary: Upload/ganti foto profile
-      description: Upload file foto profil, disimpan ke object storage (MinIO). Field `photoUrl` pada profile akan diupdate otomatis.
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [photo]
-              properties:
-                photo:
-                  type: string
-                  format: binary
-                  description: File gambar (png, jpg, webp — maks 2MB)
-      responses:
-        '200':
-          description: Foto profile berhasil diupload
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Profile'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-
-  /profile/social-media:
-    get:
-      tags: [Profile]
-      summary: List semua social media
-      responses:
-        '200':
-          description: Daftar social media
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SocialMediaLink'
-
-  /profile/social-media/{platform}:
-    parameters:
-      - $ref: '#/components/parameters/PlatformParam'
-    get:
-      tags: [Profile]
-      summary: Detail social media per platform
-      responses:
-        '200':
-          description: Detail social media
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SocialMediaLink'
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PublicProfile' }
         '404':
           $ref: '#/components/responses/NotFound'
-    put:
-      tags: [Profile]
-      summary: Update social media per platform
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SocialMediaInput'
-      responses:
-        '200':
-          description: Social media berhasil diupdate
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SocialMediaLink'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
 
-  # ============================================================
-  # SKILLS
-  # ============================================================
-  /skills:
+  /projects:
     get:
-      tags: [Skills]
-      summary: List semua skill
+      tags: [Public]
+      summary: Project terbit untuk Projects Archive (berpaginasi)
       parameters:
         - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/LimitParam'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 12 }
+      responses:
+        '200':
+          description: Daftar project terbit
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PublicProject' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [Public]
+      summary: Detail project terbit
+      description: Project yang belum terbit dibalas 404 seperti tidak ada.
+      responses:
+        '200':
+          description: Project
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PublicProject' }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /skills:
+    get:
+      tags: [Public]
+      summary: Skill terbit dikelompokkan per kategori
+      description: Urut kategori → skill. Kategori tanpa skill terbit tidak ditampilkan.
+      responses:
+        '200':
+          description: Skill per kategori
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PublicSkillGroup' }
+
+  /timeline:
+    get:
+      tags: [Public]
+      summary: Education & Work/Organization, terurut dan berlabel
+      description: |
+        Struktur selalu organisasi → posisi; frontend memilih Timeline Item (1 posisi) atau
+        Timeline Group (≥ 2 posisi). Organisasi tanpa posisi tidak ditampilkan.
+      responses:
+        '200':
+          description: Timeline
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/PublicTimeline' }
+
+  /social-links:
+    get:
+      tags: [Public]
+      summary: Tautan media sosial yang aktif
+      responses:
+        '200':
+          description: Tautan sosial
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PublicSocialLink' }
+
+  /certificates:
+    get:
+      tags: [Public]
+      summary: Sertifikat yang terbit, urut sort_order (tanpa paginasi)
+      description: |
+        `file == null` → sembunyikan tombol View; `credential_url == null` → sembunyikan Verify.
+        `file.mime` menentukan perilaku View: gambar → lightbox, PDF → tab baru
+        (disajikan `Content-Disposition: inline`).
+      responses:
+        '200':
+          description: Daftar sertifikat
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PublicCertificate' }
+
+  # ============================================================
+  # HEALTH
+  # ============================================================
+  /health:
+    get:
+      tags: [Health]
+      summary: Status kesehatan API
+      description: Melakukan ping ke database. Detail error tidak pernah dikembalikan.
+      responses:
+        '200':
+          description: Semua komponen sehat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                data: { status: ok, database: ok }
+        '503':
+          description: Database tidak bisa dijangkau
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                data: { status: error, database: unreachable }
+
+  # ============================================================
+  # AUTH (admin)
+  # ============================================================
+  /admin/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login admin
+      description: |
+        Mengembalikan access token (JWT HS256) di body dan memasang refresh token di cookie
+        `refresh_token` (`HttpOnly; SameSite=Strict; Path=/api/v1/admin/auth`, `Secure` di
+        production). Refresh token tidak pernah muncul di body.
+        Pembatasan percobaan login dilakukan di reverse proxy (bukan di aplikasi).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              additionalProperties: false
+              properties:
+                username:
+                  type: string
+                  maxLength: 50
+                  example: admin
+                password:
+                  type: string
+                  format: password
+                  maxLength: 128
+                  example: supersecret
+      responses:
+        '200':
+          description: Login berhasil
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/RefreshTokenCookie'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/AccessToken'
+                      - type: object
+                        required: [admin]
+                        properties:
+                          admin:
+                            $ref: '#/components/schemas/Admin'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+
+  /admin/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Tukar refresh token dengan access token baru
+      description: |
+        Membaca cookie `refresh_token`, merotasinya (token lama langsung dicabut), dan memasang
+        cookie baru. Memakai token yang sudah dicabut dianggap pencurian: semua sesi admin itu
+        ikut dicabut.
+      parameters:
+        - $ref: '#/components/parameters/RefreshTokenCookieParam'
+      responses:
+        '200':
+          description: Access token baru
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/RefreshTokenCookie'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AccessToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      description: Mencabut refresh token dari cookie dan menghapus cookie. Idempoten.
+      parameters:
+        - $ref: '#/components/parameters/RefreshTokenCookieParam'
+      responses:
+        '204':
+          description: Logout berhasil (juga bila tidak ada sesi)
+          headers:
+            Set-Cookie:
+              description: '`refresh_token=; Max-Age=0; ...` (menghapus cookie)'
+              schema:
+                type: string
+
+  /admin/auth/me:
+    get:
+      tags: [Auth]
+      summary: Data admin yang sedang login
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Data admin
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Admin'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================
+  # SKILLS (admin)
+  # ============================================================
+  /admin/skills:
+    get:
+      tags: [Skills]
+      summary: Daftar skill (termasuk yang belum terbit)
+      description: Urut kategori (sort_order) → skill (sort_order).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: category_id
+          in: query
+          schema: { type: integer, minimum: 1 }
       responses:
         '200':
           description: Daftar skill
@@ -205,16 +424,41 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [data]
                 properties:
                   data:
                     type: array
-                    items:
-                      $ref: '#/components/schemas/Skill'
-                  meta:
-                    $ref: '#/components/schemas/PaginationMeta'
+                    items: { $ref: '#/components/schemas/Skill' }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
     post:
       tags: [Skills]
-      summary: Tambah skill baru
+      summary: Tambah skill (ditaruh paling akhir di kategorinya)
+      description: Skill terbit wajib punya `logo_id` hasil upload `kind=skill_logo`. Nama unik per kategori (409).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SkillCreateInput' }
+      responses:
+        '201':
+          $ref: '#/components/responses/SkillOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /admin/skills/reorder:
+    patch:
+      tags: [Skills]
+      summary: Simpan urutan skill di dalam satu kategori
+      description: '`ids` harus memuat semua skill kategori itu tepat satu kali.'
       security:
         - bearerAuth: []
       requestBody:
@@ -222,37 +466,313 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SkillInput'
+              type: object
+              required: [category_id, ids]
+              additionalProperties: false
+              properties:
+                category_id: { type: integer, minimum: 1 }
+                ids:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items: { type: integer, minimum: 1 }
       responses:
-        '201':
-          description: Skill berhasil dibuat
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Skill'
+        '204':
+          description: Urutan tersimpan
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
-  /skills/{id}:
+  /admin/skills/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     get:
       tags: [Skills]
       summary: Detail skill
+      security:
+        - bearerAuth: []
       responses:
         '200':
-          description: Detail skill
+          $ref: '#/components/responses/SkillOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Skills]
+      summary: Ubah sebagian skill
+      description: Pindah kategori menaruh skill di urutan terakhir kategori baru.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SkillUpdateInput' }
+      responses:
+        '200':
+          $ref: '#/components/responses/SkillOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [Skills]
+      summary: Hapus skill
+      description: Logo yang tidak lagi dipakai dibersihkan oleh `npm run media:cleanup`.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Skill terhapus
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # SOCIAL LINKS (admin)
+  # ============================================================
+  /admin/social-links:
+    get:
+      tags: [Social Links]
+      summary: Daftar tautan sosial (termasuk yang tidak terbit)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Daftar tautan
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Skill'
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/SocialLink' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Social Links]
+      summary: Tambah tautan (ditaruh paling akhir)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SocialLinkCreateInput' }
+      responses:
+        '201':
+          $ref: '#/components/responses/SocialLinkOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/social-links/reorder:
+    patch:
+      tags: [Social Links]
+      summary: Simpan urutan tautan hasil drag & drop
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReorderInput' }
+      responses:
+        '204':
+          description: Urutan tersimpan
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/social-links/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    patch:
+      tags: [Social Links]
+      summary: Ubah sebagian tautan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SocialLinkUpdateInput' }
+      responses:
+        '200':
+          $ref: '#/components/responses/SocialLinkOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-    put:
-      tags: [Skills]
-      summary: Update skill
+    delete:
+      tags: [Social Links]
+      summary: Hapus tautan
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Tautan terhapus
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # CERTIFICATES (admin)
+  # ============================================================
+  /admin/certificates:
+    get:
+      tags: [Certificates]
+      summary: Daftar sertifikat (termasuk draf), urut sort_order
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Daftar sertifikat
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Certificate' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Certificates]
+      summary: Tambah sertifikat (ditaruh paling akhir; default draf)
+      description: |
+        Validasi tambahan (400, `details[].field`):
+        - `expires_at` sebelum `issued_at` → `expires_at`: "Expiry must be after the issue date."
+          (bulan yang sama diterima);
+        - `issued_at` setelah bulan ini → `issued_at`: "Issue date cannot be in the future.";
+        - terbit tanpa `file_id` dan tanpa `credential_url` → `file_id`:
+          "Add a file or a credential URL to publish.";
+        - `file_id` tidak ada atau bukan upload `certificate_file` → `file_id`: "Invalid file."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CertificateCreateInput' }
+            example:
+              { name: AWS Certified Cloud Practitioner, issuer: Amazon Web Services,
+                issued_at: 2025-03, file_id: 42, is_published: true }
+      responses:
+        '201':
+          $ref: '#/components/responses/CertificateOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/certificates/reorder:
+    patch:
+      tags: [Certificates]
+      summary: Simpan urutan sertifikat hasil drag & drop
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReorderInput' }
+      responses:
+        '204':
+          description: Urutan tersimpan
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/certificates/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    patch:
+      tags: [Certificates]
+      summary: Ubah sebagian sertifikat
+      description: |
+        Aturan validasi sama dengan POST, dicek terhadap gabungan data lama + perubahan
+        (mis. mengosongkan `credential_url` pada sertifikat terbit tanpa file → 400).
+        `expires_at: null` = tidak kedaluwarsa; `file_id: null` = lepas file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CertificateUpdateInput' }
+      responses:
+        '200':
+          $ref: '#/components/responses/CertificateOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Certificates]
+      summary: Hapus sertifikat
+      description: File yang terlepas dibersihkan oleh `npm run media:cleanup`.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Sertifikat terhapus
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # PROFILE (admin)
+  # ============================================================
+  /admin/profile:
+    get:
+      tags: [Profile]
+      summary: Profil pemilik portofolio (admin)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/ProfileOk'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Profile]
+      summary: Ubah sebagian profil
+      description: |
+        Tombol "Save changes" per section mengirim field section itu saja (minimal satu field).
+        Teks di-trim dan tidak boleh mengandung HTML.
       security:
         - bearerAuth: []
       requestBody:
@@ -260,78 +780,324 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SkillInput'
+              $ref: '#/components/schemas/ProfileUpdateInput'
       responses:
         '200':
-          description: Skill berhasil diupdate
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Skill'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
+          $ref: '#/components/responses/ProfileOk'
+        '400':
           $ref: '#/components/responses/ValidationError'
-    delete:
-      tags: [Skills]
-      summary: Hapus skill
-      security:
-        - bearerAuth: []
-      responses:
-        '204':
-          description: Skill berhasil dihapus
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /skills/{id}/logo:
-    parameters:
-      - $ref: '#/components/parameters/IdParam'
+  # ============================================================
+  # TIMELINE (admin): organizations & positions
+  # ============================================================
+  /admin/organizations:
+    get:
+      tags: [Timeline]
+      summary: Daftar organisasi beserta posisinya
+      description: Diurutkan sesuai aturan timeline (API.md §6), termasuk yang belum lengkap.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrganizationGroup'
+      responses:
+        '200':
+          description: Daftar organisasi
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Organization'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
     post:
-      tags: [Skills]
-      summary: Upload/ganti logo skill
-      description: Upload file gambar logo, disimpan ke object storage (MinIO). Field `logoUrl` pada skill akan diupdate otomatis.
+      tags: [Timeline]
+      summary: Tambah organisasi
       security:
         - bearerAuth: []
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
-              type: object
-              required: [logo]
-              properties:
-                logo:
-                  type: string
-                  format: binary
-                  description: File gambar (png, jpg, webp, svg — maks 2MB)
+              $ref: '#/components/schemas/OrganizationCreateInput'
+      responses:
+        '201':
+          $ref: '#/components/responses/OrganizationOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /admin/organizations/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    patch:
+      tags: [Timeline]
+      summary: Ubah nama/lokasi organisasi
+      description: '`group` tidak bisa diubah karena posisi terikat aturan tipe per grup.'
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationUpdateInput'
       responses:
         '200':
-          description: Logo berhasil diupload
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Skill'
+          $ref: '#/components/responses/OrganizationOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '422':
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [Timeline]
+      summary: Hapus organisasi beserta semua posisinya
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Organisasi dan posisinya terhapus
+        '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/organizations/{id}/positions/reorder:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    patch:
+      tags: [Timeline]
+      summary: Simpan urutan posisi hasil drag & drop
+      description: '`ids` harus memuat semua posisi organisasi tepat satu kali.'
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderInput'
+      responses:
+        '204':
+          description: Urutan tersimpan
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/positions:
+    post:
+      tags: [Timeline]
+      summary: Tambah posisi (panel "Timeline item")
+      description: |
+        Kirim `organization_id`, ATAU `organization_name` + `group` (organisasi dibuat bila belum ada).
+        Aturan bisnis (API.md §3) dilaporkan per field dengan status 400.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PositionCreateInput'
+      responses:
+        '201':
+          $ref: '#/components/responses/PositionOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/positions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    patch:
+      tags: [Timeline]
+      summary: Ubah sebagian posisi
+      description: Aturan bisnis divalidasi terhadap gabungan data lama + perubahan.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PositionUpdateInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/PositionOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Timeline]
+      summary: Hapus posisi
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Posisi terhapus
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # ============================================================
-  # PROJECTS
+  # SKILL CATEGORIES (admin)
   # ============================================================
-  /projects:
+  /admin/skill-categories:
+    get:
+      tags: [Skill Categories]
+      summary: Daftar kategori skill (urut sort_order)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Daftar kategori
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SkillCategory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Skill Categories]
+      summary: Tambah kategori (ditaruh paling akhir)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillCategoryInput'
+      responses:
+        '201':
+          $ref: '#/components/responses/SkillCategoryOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /admin/skill-categories/reorder:
+    patch:
+      tags: [Skill Categories]
+      summary: Simpan urutan kategori hasil drag & drop
+      description: '`ids` harus memuat semua kategori tepat satu kali.'
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderInput'
+      responses:
+        '204':
+          description: Urutan tersimpan
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/skill-categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    patch:
+      tags: [Skill Categories]
+      summary: Ganti nama kategori
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillCategoryInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/SkillCategoryOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [Skill Categories]
+      summary: Hapus kategori
+      description: Ditolak 409 bila kategori masih berisi skill.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Kategori terhapus
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ============================================================
+  # PROJECTS (admin)
+  # ============================================================
+  /admin/projects:
     get:
       tags: [Projects]
-      summary: List semua project
+      summary: Daftar project (termasuk yang belum terbit)
+      description: Urut sort_order ASC, lalu created_at DESC.
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/LimitParam'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 12 }
       responses:
         '200':
           description: Daftar project
@@ -339,6 +1105,7 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [data, meta]
                 properties:
                   data:
                     type: array
@@ -346,9 +1113,16 @@ paths:
                       $ref: '#/components/schemas/Project'
                   meta:
                     $ref: '#/components/schemas/PaginationMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
     post:
       tags: [Projects]
-      summary: Tambah project baru
+      summary: Tambah project
+      description: |
+        `show_button` default mengikuti ada/tidaknya `link_url`; `is_published` default true.
+        Project terbit wajib punya `image_id` hasil upload `kind=project_image`.
       security:
         - bearerAuth: []
       requestBody:
@@ -356,37 +1130,57 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProjectInput'
+              $ref: '#/components/schemas/ProjectCreateInput'
       responses:
         '201':
-          description: Project berhasil dibuat
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Project'
+          $ref: '#/components/responses/ProjectOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
 
-  /projects/{id}:
+  /admin/projects/reorder:
+    patch:
+      tags: [Projects]
+      summary: Simpan urutan project hasil drag & drop
+      description: '`ids` harus memuat semua project tepat satu kali.'
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderInput'
+      responses:
+        '204':
+          description: Urutan tersimpan
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/projects/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     get:
       tags: [Projects]
       summary: Detail project
+      security:
+        - bearerAuth: []
       responses:
         '200':
-          description: Detail project
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Project'
+          $ref: '#/components/responses/ProjectOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-    put:
+    patch:
       tags: [Projects]
-      summary: Update project
+      summary: Ubah sebagian project
+      description: Aturan divalidasi terhadap gabungan data lama + perubahan.
       security:
         - bearerAuth: []
       requestBody:
@@ -394,20 +1188,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProjectInput'
+              $ref: '#/components/schemas/ProjectUpdateInput'
       responses:
         '200':
-          description: Project berhasil diupdate
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Project'
+          $ref: '#/components/responses/ProjectOk'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
     delete:
       tags: [Projects]
       summary: Hapus project
@@ -415,228 +1205,97 @@ paths:
         - bearerAuth: []
       responses:
         '204':
-          description: Project berhasil dihapus
+          description: Project terhapus
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /projects/{id}/thumbnail:
-    parameters:
-      - $ref: '#/components/parameters/IdParam'
+  # ============================================================
+  # UPLOADS (admin)
+  # ============================================================
+  /admin/uploads:
     post:
-      tags: [Projects]
-      summary: Upload/ganti thumbnail project
-      description: Upload file gambar thumbnail, disimpan ke object storage (MinIO). Field `thumbnailUrl` pada project akan diupdate otomatis.
+      tags: [Uploads]
+      summary: Unggah file (langkah 1 dari 2 — lalu kirim id-nya di form resource)
+      description: |
+        Jenis file ditentukan dari ISI file, bukan dari header `Content-Type` klien.
+        - `project_image`, `profile_photo`: PNG/JPEG/WebP → WebP (400/800/1200 atau 400/800 px),
+          orientasi EXIF diterapkan, metadata dibuang. Maks 2 MB.
+        - `skill_logo`: PNG/JPEG/WebP → WebP 128/256 px, atau SVG yang disanitasi (tetap vektor).
+          Maks 2 MB.
+        - `certificate_file`: PDF disimpan apa adanya (`mime: application/pdf`, `width`/`height`
+          null, varian `original`, disajikan `Content-Disposition: inline`), atau PNG/JPEG/WebP →
+          WebP 800/1600 px. Maks 5 MB.
+        Gambar maksimal 36 megapiksel. Objek disajikan dengan `Cache-Control: immutable`.
+        Upload yang tidak dipakai dihapus oleh `npm run media:cleanup` setelah 24 jam.
       security:
         - bearerAuth: []
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [project_image, skill_logo, profile_photo, certificate_file]
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
-              required: [thumbnail]
+              required: [file]
               properties:
-                thumbnail:
-                  type: string
-                  format: binary
-                  description: File gambar (png, jpg, webp — maks 2MB)
-      responses:
-        '200':
-          description: Thumbnail berhasil diupload
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Project'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-
-  # ============================================================
-  # EXPERIENCE - EDUCATIONS
-  # ============================================================
-  /experience/educations:
-    get:
-      tags: [Experience]
-      summary: List riwayat pendidikan
-      responses:
-        '200':
-          description: Daftar pendidikan
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Education'
-    post:
-      tags: [Experience]
-      summary: Tambah riwayat pendidikan
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EducationInput'
+                file: { type: string, format: binary }
       responses:
         '201':
-          description: Pendidikan berhasil ditambahkan
+          description: File tersimpan
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Education'
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/Image'
+                      - type: object
+                        required: [kind]
+                        properties:
+                          kind:
+                            type: string
+                            enum: [project_image, skill_logo, profile_photo, certificate_file]
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
 
-  /experience/educations/{id}:
+  /admin/uploads/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
-    get:
-      tags: [Experience]
-      summary: Detail pendidikan
-      responses:
-        '200':
-          description: Detail pendidikan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Education'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    put:
-      tags: [Experience]
-      summary: Update riwayat pendidikan
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EducationInput'
-      responses:
-        '200':
-          description: Pendidikan berhasil diupdate
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Education'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
     delete:
-      tags: [Experience]
-      summary: Hapus riwayat pendidikan
+      tags: [Uploads]
+      summary: Hapus file yang tidak dipakai
+      description: Ditolak 409 bila file masih dipakai project, profil, skill, atau sertifikat.
       security:
         - bearerAuth: []
       responses:
         '204':
-          description: Pendidikan berhasil dihapus
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  # ============================================================
-  # EXPERIENCE - JOBS
-  # ============================================================
-  /experience/jobs:
-    get:
-      tags: [Experience]
-      summary: List riwayat pekerjaan
-      responses:
-        '200':
-          description: Daftar pekerjaan
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Job'
-    post:
-      tags: [Experience]
-      summary: Tambah riwayat pekerjaan
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/JobInput'
-      responses:
-        '201':
-          description: Pekerjaan berhasil ditambahkan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Job'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
+          description: File terhapus
+        '400':
           $ref: '#/components/responses/ValidationError'
-
-  /experience/jobs/{id}:
-    parameters:
-      - $ref: '#/components/parameters/IdParam'
-    get:
-      tags: [Experience]
-      summary: Detail pekerjaan
-      responses:
-        '200':
-          description: Detail pekerjaan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Job'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    put:
-      tags: [Experience]
-      summary: Update riwayat pekerjaan
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/JobInput'
-      responses:
-        '200':
-          description: Pekerjaan berhasil diupdate
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Job'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-    delete:
-      tags: [Experience]
-      summary: Hapus riwayat pekerjaan
-      security:
-        - bearerAuth: []
-      responses:
-        '204':
-          description: Pekerjaan berhasil dihapus
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
 # ============================================================
 # COMPONENTS
@@ -648,72 +1307,786 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  headers:
+    ETag:
+      description: Hash isi respons; kirim balik lewat If-None-Match untuk 304
+      schema: { type: string }
+    PublicCacheControl:
+      description: 'public, max-age=60, stale-while-revalidate=300'
+      schema: { type: string }
+    RefreshTokenCookie:
+      description: '`refresh_token=<token>; Max-Age=604800; Path=/api/v1/admin/auth; HttpOnly; SameSite=Strict` (+ `Secure` di production)'
+      schema:
+        type: string
+
   parameters:
+    RefreshTokenCookieParam:
+      name: refresh_token
+      in: cookie
+      required: false
+      description: Diisi otomatis oleh browser dari login/refresh sebelumnya
+      schema:
+        type: string
     IdParam:
       name: id
       in: path
       required: true
       schema:
         type: integer
+        minimum: 1
       example: 1
-    PlatformParam:
-      name: platform
-      in: path
-      required: true
-      description: Nama platform sebagai unique key (bukan integer id)
-      schema:
-        type: string
-        enum: [linkedin, github, facebook, instagram, twitter]
-      example: linkedin
     PageParam:
       name: page
       in: query
       schema:
         type: integer
+        minimum: 1
         default: 1
-    LimitParam:
-      name: limit
-      in: query
-      schema:
-        type: integer
-        default: 10
-
   responses:
-    Unauthorized:
-      description: Token tidak valid atau tidak disertakan
+    SkillOk:
+      description: Data skill
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/Skill' }
+    CertificateOk:
+      description: Data sertifikat
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/Certificate' }
+    SocialLinkOk:
+      description: Data tautan sosial
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/SocialLink' }
+    SkillCategoryOk:
+      description: Data kategori skill
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                $ref: '#/components/schemas/SkillCategory'
+    ProjectOk:
+      description: Data project
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                $ref: '#/components/schemas/Project'
+    ProfileOk:
+      description: Data profil
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                $ref: '#/components/schemas/Profile'
+    OrganizationOk:
+      description: Data organisasi
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                $ref: '#/components/schemas/Organization'
+    PositionOk:
+      description: Data posisi
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                $ref: '#/components/schemas/Position'
+    Conflict:
+      description: Bentrok dengan data yang ada (`CONFLICT`), mis. nama duplikat
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-    NotFound:
-      description: Resource tidak ditemukan
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: CONFLICT
+              message: An organization with this name already exists in this group.
+              details:
+                - { field: name, message: Name is already used in this group. }
     ValidationError:
-      description: Payload tidak valid
+      description: Input tidak valid (`VALIDATION_ERROR`); `details` berisi pesan per field
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Some fields are invalid.
+              details:
+                - { field: name, message: This field is required. }
+    Unauthorized:
+      description: Access token atau refresh token tidak ada, kedaluwarsa, atau tidak valid (`UNAUTHORIZED`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: { code: UNAUTHORIZED, message: Missing or invalid access token. }
+    InvalidCredentials:
+      description: Username atau password salah (`INVALID_CREDENTIALS`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: { code: INVALID_CREDENTIALS, message: Invalid username or password. }
+    NotFound:
+      description: Resource tidak ditemukan (`NOT_FOUND`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: { code: NOT_FOUND, message: Skill with id 99 was not found. }
+    PayloadTooLarge:
+      description: |
+        File melebihi batas jenisnya (`PAYLOAD_TOO_LARGE`): 2 MB untuk gambar, 5 MB untuk
+        `certificate_file`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: { code: PAYLOAD_TOO_LARGE, message: File must be 2 MB or smaller. }
+    UnsupportedMediaType:
+      description: Tipe file tidak diizinkan (`UNSUPPORTED_MEDIA_TYPE`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: { code: UNSUPPORTED_MEDIA_TYPE, message: Use PNG, JPG, WebP or SVG. }
 
   schemas:
     Error:
       type: object
+      required: [error]
+      additionalProperties: false
       properties:
-        statusCode:
-          type: integer
-          example: 404
         error:
+          type: object
+          required: [code, message]
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+              enum:
+                - BAD_REQUEST
+                - VALIDATION_ERROR
+                - UNAUTHORIZED
+                - INVALID_CREDENTIALS
+                - FORBIDDEN
+                - NOT_FOUND
+                - CONFLICT
+                - PAYLOAD_TOO_LARGE
+                - UNSUPPORTED_MEDIA_TYPE
+                - RATE_LIMITED
+                - INTERNAL_ERROR
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                required: [field, message]
+                additionalProperties: false
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+
+    HealthResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [status, database]
+          additionalProperties: false
+          properties:
+            status:
+              type: string
+              enum: [ok, error]
+            database:
+              type: string
+              enum: [ok, unreachable]
+
+    AccessToken:
+      type: object
+      required: [access_token, expires_in]
+      properties:
+        access_token:
           type: string
-          example: "Not Found"
-        message:
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        expires_in:
+          type: integer
+          description: Masa berlaku access token dalam detik
+          example: 900
+
+    Admin:
+      type: object
+      required: [id, username]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
           type: string
-          example: "Skill dengan id tersebut tidak ditemukan."
+          example: admin
+
+    Profile:
+      type: object
+      required: [greeting, tagline, about, project_intro, email, photo, updated_at]
+      additionalProperties: false
+      properties:
+        greeting: { type: string, maxLength: 80, example: "Hi, I'm Ary Kurnia" }
+        tagline: { type: string, maxLength: 120, example: a Web and Back-End developer }
+        about: { type: string, maxLength: 1000 }
+        project_intro: { type: [string, 'null'], maxLength: 200 }
+        email: { type: string, format: email }
+        photo: { $ref: '#/components/schemas/NullableImage' }
+        updated_at: { type: string, format: date-time }
+
+    ProfileUpdateInput:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        greeting: { type: string, maxLength: 80 }
+        tagline: { type: string, maxLength: 120 }
+        about: { type: string, maxLength: 1000 }
+        project_intro: { type: [string, 'null'], maxLength: 200 }
+        email: { type: string, format: email, maxLength: 254 }
+        photo_id:
+          type: [integer, 'null']
+          minimum: 1
+          description: id hasil upload kind=profile_photo; null menghapus foto
+
+    OrganizationGroup:
+      type: string
+      enum: [education, work_organization]
+
+    PositionType:
+      type: string
+      enum: [full_time, part_time, freelance, contract, internship, self_employed,
+             member, board, committee, volunteer, education]
+
+    YearMonth:
+      type: string
+      pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+      example: 2024-01
+
+    Organization:
+      type: object
+      required: [id, name, group, location, sort_order, is_current, positions]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        name: { type: string, example: UKM MAPALA Universitas Handayani Makassar }
+        group: { $ref: '#/components/schemas/OrganizationGroup' }
+        location: { type: [string, 'null'] }
+        sort_order: { type: [integer, 'null'] }
+        is_current:
+          type: boolean
+          description: true bila salah satu posisinya masih berjalan
+        positions:
+          type: array
+          items: { $ref: '#/components/schemas/Position' }
+
+    Position:
+      type: object
+      required: [id, organization_id, title, type, type_label, event_name, start_date, end_date,
+                 is_current, period_label, description, sort_order]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        organization_id: { type: integer }
+        title: { type: string, example: Ketua Panitia }
+        type: { $ref: '#/components/schemas/PositionType' }
+        type_label: { type: string, example: Committee }
+        event_name: { type: [string, 'null'], example: Diksar }
+        start_date: { $ref: '#/components/schemas/YearMonth' }
+        end_date:
+          oneOf:
+            - $ref: '#/components/schemas/YearMonth'
+            - type: 'null'
+        is_current: { type: boolean }
+        period_label:
+          type: string
+          description: '"YYYY – YYYY", "YYYY – Present", atau "YYYY" (en dash)'
+          example: 2023 – 2025
+        description: { type: [string, 'null'] }
+        sort_order: { type: [integer, 'null'] }
+
+    OrganizationCreateInput:
+      type: object
+      required: [name, group]
+      additionalProperties: false
+      properties:
+        name: { type: string, maxLength: 120 }
+        group: { $ref: '#/components/schemas/OrganizationGroup' }
+        location: { type: [string, 'null'], maxLength: 80 }
+
+    OrganizationUpdateInput:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name: { type: string, maxLength: 120 }
+        location: { type: [string, 'null'], maxLength: 80 }
+
+    PositionFields:
+      type: object
+      properties:
+        title: { type: string, maxLength: 120 }
+        type: { $ref: '#/components/schemas/PositionType' }
+        event_name:
+          type: [string, 'null']
+          maxLength: 120
+          description: Wajib bila type = committee, selain itu harus null
+        start_date:
+          allOf:
+            - $ref: '#/components/schemas/YearMonth'
+          description: Paling jauh satu tahun ke depan
+        end_date:
+          oneOf:
+            - $ref: '#/components/schemas/YearMonth'
+            - type: 'null'
+          description: Harus null bila is_current; tidak boleh sebelum start_date
+        is_current: { type: boolean, default: false }
+        description: { type: [string, 'null'], maxLength: 500 }
+
+    PositionCreateInput:
+      description: |
+        Tepat salah satu: `organization_id`, atau `organization_name` + `group`.
+        Organisasi grup education hanya menerima type education, dan sebaliknya.
+      allOf:
+        - $ref: '#/components/schemas/PositionFields'
+        - type: object
+          required: [title, type, start_date]
+          properties:
+            organization_id: { type: integer, minimum: 1 }
+            organization_name: { type: string, maxLength: 120 }
+            group: { $ref: '#/components/schemas/OrganizationGroup' }
+          oneOf:
+            - required: [organization_id]
+            - required: [organization_name, group]
+
+    PositionUpdateInput:
+      allOf:
+        - $ref: '#/components/schemas/PositionFields'
+        - type: object
+          minProperties: 1
+
+    ReorderInput:
+      type: object
+      required: [ids]
+      additionalProperties: false
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: integer, minimum: 1 }
+
+    SkillCategory:
+      type: object
+      required: [id, name, sort_order, skill_count]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        name: { type: string, maxLength: 40, example: Backend }
+        sort_order: { type: integer }
+        skill_count:
+          type: integer
+          description: Jumlah skill; DELETE kategori ditolak 409 bila > 0
+
+    SkillCategoryInput:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 40 }
+
+    Project:
+      type: object
+      required: [id, title, description, image_id, image, link_url, show_button, is_published, sort_order,
+                 created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 60, example: FitAI Coach }
+        description: { type: string, maxLength: 300 }
+        image_id: { type: [integer, 'null'] }
+        image: { $ref: '#/components/schemas/NullableImage' }
+        link_url: { type: [string, 'null'], format: uri }
+        show_button: { type: boolean }
+        is_published: { type: boolean }
+        sort_order: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ProjectFields:
+      type: object
+      properties:
+        title: { type: string, maxLength: 60 }
+        description: { type: string, maxLength: 300 }
+        image_id:
+          type: [integer, 'null']
+          minimum: 1
+          description: id hasil upload kind=project_image
+        link_url:
+          type: [string, 'null']
+          format: uri
+          maxLength: 2048
+          description: Hanya https
+        show_button:
+          type: boolean
+          description: true mensyaratkan link_url
+        is_published:
+          type: boolean
+          description: true mensyaratkan image_id
+
+    ProjectCreateInput:
+      allOf:
+        - $ref: '#/components/schemas/ProjectFields'
+        - type: object
+          required: [title, description]
+
+    ProjectUpdateInput:
+      allOf:
+        - $ref: '#/components/schemas/ProjectFields'
+        - type: object
+          minProperties: 1
+
+    PublicProfile:
+      type: object
+      required: [greeting, tagline, about, project_intro, email, photo]
+      additionalProperties: false
+      properties:
+        greeting: { type: string }
+        tagline: { type: string }
+        about: { type: string }
+        project_intro: { type: [string, 'null'] }
+        email: { type: string, format: email }
+        photo: { $ref: '#/components/schemas/NullableImage' }
+
+    PublicProject:
+      type: object
+      required: [id, title, description, image, link_url, show_button]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        image: { $ref: '#/components/schemas/NullableImage' }
+        link_url: { type: [string, 'null'], format: uri }
+        show_button: { type: boolean }
+
+    PublicPosition:
+      type: object
+      required: [id, title, type, type_label, event_name, start_date, end_date, is_current,
+                 period_label, description]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        type: { $ref: '#/components/schemas/PositionType' }
+        type_label: { type: string, example: Full-time }
+        event_name: { type: [string, 'null'] }
+        start_date: { $ref: '#/components/schemas/YearMonth' }
+        end_date:
+          oneOf:
+            - $ref: '#/components/schemas/YearMonth'
+            - type: 'null'
+        is_current: { type: boolean }
+        period_label: { type: string, example: 2025 – Present }
+        description: { type: [string, 'null'] }
+
+    PublicOrganization:
+      type: object
+      required: [id, name, location, is_current, positions]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        location: { type: [string, 'null'] }
+        is_current: { type: boolean }
+        positions:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/PublicPosition' }
+
+    PublicTimeline:
+      type: object
+      required: [education, work_organization]
+      additionalProperties: false
+      properties:
+        education:
+          type: array
+          items: { $ref: '#/components/schemas/PublicOrganization' }
+        work_organization:
+          type: array
+          items: { $ref: '#/components/schemas/PublicOrganization' }
+
+    PublicSocialLink:
+      type: object
+      required: [platform, label, url]
+      additionalProperties: false
+      properties:
+        platform: { $ref: '#/components/schemas/SocialPlatform' }
+        label:
+          type: string
+          description: Label kustom, atau nama platform bila kosong
+          example: GitHub
+        url: { type: string, format: uri }
+
+    Image:
+      type: object
+      description: Media hasil upload (gambar, atau PDF untuk `certificate_file`).
+      required: [id, url, width, height, mime, size, variants]
+      properties:
+        id: { type: integer, description: Dipakai sebagai image_id / photo_id / logo_id / file_id }
+        url: { type: string, format: uri, description: Versi utama (terbesar) }
+        width: { type: [integer, 'null'], description: Lebar gambar asli; null untuk PDF }
+        height: { type: [integer, 'null'] }
+        mime: { type: string, enum: [image/webp, image/svg+xml, application/pdf] }
+        size: { type: integer, description: Ukuran versi utama (byte) }
+        variants:
+          type: object
+          description: 'Lebar (px) → URL, untuk srcset. SVG dan PDF hanya punya "original".'
+          additionalProperties: { type: string, format: uri }
+          example:
+            '400': https://minio.example.com/portfolio/project_image/6f1c-400.webp
+            '800': https://minio.example.com/portfolio/project_image/6f1c-800.webp
+
+    NullableImage:
+      oneOf:
+        - $ref: '#/components/schemas/Image'
+        - type: 'null'
+
+    Skill:
+      type: object
+      required: [id, category_id, name, logo_id, logo, is_published, sort_order, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        category_id: { type: integer }
+        name: { type: string, maxLength: 40, example: Node.js }
+        logo_id: { type: [integer, 'null'] }
+        logo: { $ref: '#/components/schemas/NullableImage' }
+        is_published: { type: boolean }
+        sort_order: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    SkillFields:
+      type: object
+      properties:
+        category_id: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1, maxLength: 40 }
+        logo_id:
+          type: [integer, 'null']
+          minimum: 1
+          description: id hasil upload kind=skill_logo
+        is_published:
+          type: boolean
+          default: true
+          description: true mensyaratkan logo_id
+
+    SkillCreateInput:
+      allOf:
+        - $ref: '#/components/schemas/SkillFields'
+        - type: object
+          required: [category_id, name]
+
+    SkillUpdateInput:
+      allOf:
+        - $ref: '#/components/schemas/SkillFields'
+        - type: object
+          minProperties: 1
+
+    PublicSkillGroup:
+      type: object
+      required: [category, items]
+      additionalProperties: false
+      properties:
+        category:
+          type: object
+          required: [id, name]
+          additionalProperties: false
+          properties:
+            id: { type: integer }
+            name: { type: string, example: Backend }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id, name, logo]
+            additionalProperties: false
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              logo: { $ref: '#/components/schemas/NullableImage' }
+
+    SocialPlatform:
+      type: string
+      enum: [github, facebook, instagram, linkedin, discord, x, other]
+
+    SocialLink:
+      type: object
+      required: [id, platform, label, display_label, url, is_published, sort_order]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        platform: { $ref: '#/components/schemas/SocialPlatform' }
+        label: { type: [string, 'null'], description: Label kustom; null = pakai nama platform }
+        display_label: { type: string, example: GitHub }
+        url: { type: string, format: uri }
+        is_published: { type: boolean }
+        sort_order: { type: integer }
+
+    SocialLinkFields:
+      type: object
+      properties:
+        platform: { $ref: '#/components/schemas/SocialPlatform' }
+        label: { type: [string, 'null'], maxLength: 40 }
+        url: { type: string, format: uri, maxLength: 2048, description: Hanya https }
+        is_published: { type: boolean, default: true }
+
+    SocialLinkCreateInput:
+      allOf:
+        - $ref: '#/components/schemas/SocialLinkFields'
+        - type: object
+          required: [platform, url]
+
+    SocialLinkUpdateInput:
+      allOf:
+        - $ref: '#/components/schemas/SocialLinkFields'
+        - type: object
+          minProperties: 1
+
+    Certificate:
+      type: object
+      required: [id, name, issuer, issued_at, expires_at, credential_id, credential_url,
+                 file_id, file, is_published, sort_order, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        name: { type: string, maxLength: 150, example: AWS Certified Cloud Practitioner }
+        issuer: { type: string, maxLength: 100, example: Amazon Web Services }
+        issued_at: { $ref: '#/components/schemas/YearMonth' }
+        expires_at:
+          oneOf:
+            - $ref: '#/components/schemas/YearMonth'
+            - type: 'null'
+          description: null = tidak kedaluwarsa
+        credential_id: { type: [string, 'null'], maxLength: 100, example: ABC-123456 }
+        credential_url: { type: [string, 'null'], format: uri, description: Halaman verifikasi penerbit }
+        file_id: { type: [integer, 'null'] }
+        file: { $ref: '#/components/schemas/NullableImage' }
+        is_published: { type: boolean }
+        sort_order: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CertificateFields:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 150 }
+        issuer: { type: string, minLength: 1, maxLength: 100 }
+        issued_at: { $ref: '#/components/schemas/YearMonth' }
+        expires_at:
+          oneOf:
+            - $ref: '#/components/schemas/YearMonth'
+            - type: 'null'
+          description: Harus ≥ issued_at; null = tidak kedaluwarsa
+        credential_id: { type: [string, 'null'], maxLength: 100 }
+        credential_url: { type: [string, 'null'], format: uri, maxLength: 2048, description: Hanya https }
+        file_id: { type: [integer, 'null'], description: 'id dari POST /admin/uploads?kind=certificate_file' }
+        is_published: { type: boolean, default: false }
+
+    CertificateCreateInput:
+      allOf:
+        - $ref: '#/components/schemas/CertificateFields'
+        - type: object
+          required: [name, issuer, issued_at]
+
+    CertificateUpdateInput:
+      allOf:
+        - $ref: '#/components/schemas/CertificateFields'
+        - type: object
+          minProperties: 1
+
+    PublicCertificateFile:
+      type: object
+      required: [url, mime, width, height]
+      additionalProperties: false
+      properties:
+        url: { type: string, format: uri }
+        mime:
+          type: string
+          enum: [application/pdf, image/webp]
+          description: PDF → buka di tab baru; gambar → lightbox
+        width: { type: [integer, 'null'], description: Hanya gambar; untuk memesan rasio lightbox }
+        height: { type: [integer, 'null'] }
+
+    PublicCertificate:
+      type: object
+      required: [id, name, issuer, issued_at, expires_at, credential_id, credential_url, file]
+      additionalProperties: false
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        issuer: { type: string }
+        issued_at: { $ref: '#/components/schemas/YearMonth' }
+        expires_at:
+          oneOf:
+            - $ref: '#/components/schemas/YearMonth'
+            - type: 'null'
+        credential_id: { type: [string, 'null'] }
+        credential_url: { type: [string, 'null'], format: uri }
+        file:
+          oneOf:
+            - $ref: '#/components/schemas/PublicCertificateFile'
+            - type: 'null'
 
     PaginationMeta:
       type: object
+      required: [page, limit, total]
       properties:
         page:
           type: integer
@@ -724,225 +2097,3 @@ components:
         total:
           type: integer
           example: 42
-
-    SocialMediaLink:
-      type: object
-      properties:
-        platform:
-          type: string
-          example: linkedin
-        url:
-          type: string
-          example: https://www.linkedin.com/in/arykurnia
-        username:
-          type: string
-          example: arykurnia
-        enabled:
-          type: boolean
-          default: true
-
-    SocialMediaInput:
-      type: object
-      required: [url, username]
-      properties:
-        url:
-          type: string
-          example: https://www.linkedin.com/in/arykurnia
-        username:
-          type: string
-          example: arykurnia
-        enabled:
-          type: boolean
-          default: true
-
-    Profile:
-      type: object
-      properties:
-        name:
-          type: string
-          example: Ary Kurnia
-        email:
-          type: string
-          example: aryk922@gmail.com
-        tagline:
-          type: string
-          example: "a Web and Back-End developer."
-        about:
-          type: string
-          example: "Saya adalah lulusan S1 Teknik Informatika yang memiliki ketertarikan mendalam pada rekayasa perangkat lunak, khususnya di sisi backend dan infrastruktur."
-        photoUrl:
-          type: string
-          example: https://minio.arykurnia.my.id/portfolio/profile/photo.jpg
-        socialMedia:
-          type: array
-          items:
-            $ref: '#/components/schemas/SocialMediaLink'
-
-    ProfileInput:
-      type: object
-      required: [name, email, tagline, about]
-      properties:
-        name:
-          type: string
-        email:
-          type: string
-        tagline:
-          type: string
-        about:
-          type: string
-
-    Skill:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        name:
-          type: string
-          example: Node.js
-        logoUrl:
-          type: string
-          example: https://nodejs.org/static/images/logo.svg
-        description:
-          type: string
-          example: "Node.js adalah runtime JavaScript yang berjalan di server."
-        enabled:
-          type: boolean
-          default: true
-
-    SkillInput:
-      type: object
-      required: [name, logoUrl]
-      properties:
-        name:
-          type: string
-        logoUrl:
-          type: string
-        description:
-          type: string
-        enabled:
-          type: boolean
-          default: true
-
-    Project:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        name:
-          type: string
-          example: Portofolio Ary Kurnia
-        description:
-          type: string
-          example: "Sebuah situs portofolio yang menampilkan berbagai proyek dan keahlian."
-        thumbnailUrl:
-          type: string
-          example: https://arykurnia.com/thumbnail.jpg
-        url:
-          type: string
-          example: https://arykurnia.com
-        enabled:
-          type: boolean
-          default: true
-
-    ProjectInput:
-      type: object
-      required: [name, description]
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-        thumbnailUrl:
-          type: string
-        url:
-          type: string
-        enabled:
-          type: boolean
-          default: true
-
-    Education:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        institution:
-          type: string
-          example: Universitas XYZ
-        degree:
-          type: string
-          example: Sarjana Teknik Informatika
-        fieldOfStudy:
-          type: string
-          example: Teknik Informatika
-        startDate:
-          type: string
-          format: date
-          example: 2015-09-01
-        endDate:
-          type: string
-          format: date
-          example: 2019-06-30
-        description:
-          type: string
-
-    EducationInput:
-      type: object
-      required: [institution, degree, fieldOfStudy, startDate]
-      properties:
-        institution:
-          type: string
-        degree:
-          type: string
-        fieldOfStudy:
-          type: string
-        startDate:
-          type: string
-          format: date
-        endDate:
-          type: string
-          format: date
-        description:
-          type: string
-
-    Job:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        company:
-          type: string
-          example: PT ABC
-        position:
-          type: string
-          example: Backend Developer
-        startDate:
-          type: string
-          format: date
-          example: 2019-07-01
-        endDate:
-          type: string
-          format: date
-          example: 2021-12-31
-        description:
-          type: string
-
-    JobInput:
-      type: object
-      required: [company, position, startDate]
-      properties:
-        company:
-          type: string
-        position:
-          type: string
-        startDate:
-          type: string
-          format: date
-        endDate:
-          type: string
-          format: date
-        description:
-          type: string

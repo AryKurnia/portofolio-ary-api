@@ -13,31 +13,63 @@
   "license": "ISC",
   "author": "Ary Kurnia",
   "type": "commonjs",
-  "main": "index.js",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=26"
+  },
   "directories": {
     "doc": "docs"
   },
   "scripts": {
-    "test": "NODE_ENV=test jest",
+    "test": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest",
     "test:migrate": "NODE_ENV=test npx sequelize-cli db:migrate",
-    "start": "node ./src/server.js",
-    "start-dev": "nodemon ./src/server.js"
+    "start": "node ./src/index.js",
+    "start-dev": "nodemon ./src/index.js",
+    "test:coverage": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:integration": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --config jest.integration.config.js",
+    "media:cleanup": "node ./scripts/cleanup-orphan-media.js",
+    "db:migrate": "sequelize-cli db:migrate"
   },
   "dependencies": {
-    "@hapi/hapi": "^21.4.7",
+    "@hapi/boom": "^10.0.1",
+    "@hapi/hapi": "^21.4.13",
     "@hapi/jwt": "^3.2.4",
     "bcrypt": "^6.0.0",
+    "dompurify": "^3.4.17",
     "dotenv": "^17.4.2",
-    "joi": "^18.2.3",
+    "hapi-pino": "^13.0.0",
+    "joi": "^18.3.2",
+    "jsdom": "^31.0.0",
     "minio": "^8.0.7",
-    "mysql2": "^3.23.1",
-    "save": "^2.9.0",
-    "sequelize": "^6.37.8"
+    "mysql2": "^3.24.6",
+    "pino": "^9.14.0",
+    "sequelize": "^6.37.8",
+    "sequelize-cli": "^6.6.5",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
-    "dotenv-cli": "^11.0.0",
-    "jest": "^30.4.2",
+    "@eslint/js": "^10.0.1",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "dotenv-cli": "^11.1.0",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.14.0",
+    "jest": "^30.5.2",
     "nodemon": "^3.1.14",
-    "sequelize-cli": "^6.6.5"
+    "prettier": "^3.9.10",
+    "yaml": "^2.9.1"
+  },
+  "jest": {
+    "setupFiles": [
+      "<rootDir>/test/setupEnv.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/test/integration/"
+    ]
   }
 }

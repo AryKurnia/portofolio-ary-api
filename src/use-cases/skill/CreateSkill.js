@@ -1,13 +1,17 @@
 const Skill = require('../../entities/Skill');
+const validateSkill = require('./validateSkill');
+const nextSortOrder = require('./nextSortOrder');
 
 class CreateSkill {
-  constructor(skillRepository) {
-    this._skillRepository = skillRepository;
+  constructor(deps) {
+    this._deps = deps;
   }
 
-  async execute({ name, logoUrl, description, enabled }) {
-    const skill = new Skill({ name, logoUrl, description, enabled });
-    return this._skillRepository.save(skill);
+  async execute({ categoryId, name, logoMediaId, isPublished }) {
+    const skill = new Skill({ categoryId, name, logoMediaId, isPublished });
+    await validateSkill(skill, this._deps);
+    skill.sortOrder = await nextSortOrder(this._deps.skillRepository, categoryId);
+    return this._deps.skillRepository.create(skill);
   }
 }
 

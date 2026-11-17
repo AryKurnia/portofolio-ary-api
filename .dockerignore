@@ -1,0 +1,26 @@
+# Rahasia tidak boleh masuk image; env diberikan saat run (env_file di docker-compose.yml).
+.env
+.env.*
+!.env.example
+
+node_modules
+npm-debug.log*
+*.log
+coverage
+
+.git
+.gitignore
+.claude
+.vscode
+
+test
+docs
+**/*.test.js
+jest.integration.config.js
+eslint.config.js
+.prettierrc
+.prettierignore
+
+Dockerfile
+docker-compose*.yml
+.dockerignore

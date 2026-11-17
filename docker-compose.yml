@@ -1,0 +1,44 @@
+# Deploy API di homelab. MariaDB dan MinIO TIDAK ada di sini: API memakai container
+# yang sudah berjalan, lewat network eksternal `portfolio_net` (lihat docs/DEPLOY.md).
+#
+#   docker compose run --rm api npm run db:migrate   # migrasi (backup DB dulu)
+#   docker compose up -d --build                     # jalankan / perbarui
+#   docker compose logs -f api                       # log (JSON pino)
+
+name: portofolio-ary-api
+
+services:
+  api:
+    build: .
+    image: portofolio-ary-api:latest
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 3000
+      # Root filesystem read-only: cache/log npm (dipakai `npm run ...`) diarahkan ke tmpfs.
+      NPM_CONFIG_CACHE: /tmp/.npm
+    # Hanya bisa diakses dari host (Nginx); jangan buka 0.0.0.0 tanpa proxy (rate limit ada di Nginx).
+    ports:
+      - '127.0.0.1:${API_HOST_PORT:-3000}:3000'
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 15s
+    # sharp memakan memori saat konversi gambar; batas ini cukup untuk satu upload 5 MB sekaligus.
+    mem_limit: 512m
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '5'
+    networks:
+      - portfolio_net
+
+networks:
+  portfolio_net:
+    external: true

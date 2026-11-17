@@ -1,22 +1,18 @@
 const NotFoundError = require('../../exceptions/NotFoundError');
 
+// File logo tidak dihapus di sini: media yang tidak lagi dirujuk dibersihkan oleh
+// `npm run media:cleanup` (M4).
 class DeleteSkill {
-  constructor(skillRepository, fileStorage) {
+  constructor({ skillRepository }) {
     this._skillRepository = skillRepository;
-    this._fileStorage = fileStorage;
   }
 
   async execute(id) {
-    const existingSkill = await this._skillRepository.findById(id);
-    if (!existingSkill) {
-      throw new NotFoundError(`Skill dengan id ${id} tidak ditemukan`);
+    const existing = await this._skillRepository.findById(id);
+    if (!existing) {
+      throw new NotFoundError(`Skill with id ${id} was not found.`);
     }
-
-    if (existingSkill.logoUrl) {
-      await this._fileStorage.delete(existingSkill.logoUrl);
-    }
-
-    return this._skillRepository.delete(id);
+    await this._skillRepository.delete(id);
   }
 }
 
