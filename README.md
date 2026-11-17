@@ -39,7 +39,7 @@ Lewati bagian ini bila keduanya sudah berjalan.
 docker run -d --name mariadb-db-1 --restart unless-stopped \
   -e MARIADB_ROOT_PASSWORD='<password-root>' \
   -p 127.0.0.1:3306:3306 -v mariadb_data:/var/lib/mysql \
-  mariadb:11.4 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+  mariadb:11.4 --character-set-server=utf8mb4 --collation-server=utf8mb4_uca1400_ai_ci
 
 # MinIO (port 9000 = API S3, 9001 = console web)
 docker run -d --name minio --restart unless-stopped \
@@ -55,8 +55,8 @@ docker exec -it mariadb-db-1 mariadb -uroot -p
 ```
 
 ```sql
-CREATE DATABASE portfolio_db      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE portfolio_test_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE portfolio_db      CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci;
+CREATE DATABASE portfolio_test_db CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci;
 CREATE USER 'portfolio'@'%' IDENTIFIED BY '<password-db>';
 GRANT ALL PRIVILEGES ON portfolio_db.*      TO 'portfolio'@'%';
 GRANT ALL PRIVILEGES ON portfolio_test_db.* TO 'portfolio'@'%';
